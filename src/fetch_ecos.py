@@ -1,3 +1,6 @@
+import sys
+print("ECOS 스크립트 시작", flush=True)
+
 """
 한국은행 ECOS API에서 100대 주요 통계를 매일 수집·누적 저장.
 KeyStatisticList: 한국 기준금리, 시장금리, 환율, 가계신용 등 한 번에 수신.
@@ -85,4 +88,21 @@ def main():
 
     # 수출/무역 관련 항목 자동 탐지
     if "KEYSTAT_NAME" in df.columns:
-        export
+        export_rows = df[df["KEYSTAT_NAME"].str.contains("수출|무역|수입", na=False)]
+        if len(export_rows) > 0:
+            print(f"\n=== 수출·무역 관련 항목 {len(export_rows)}개 ===")
+            print(export_rows[preview_cols].to_string(index=False))
+        else:
+            print("\n수출·무역 항목이 100대 통계에 없음 → 다음 단계에서 별도 시계열 추가")
+
+    # sanity check
+    warnings = sanity_check(df, name="ECOS_KEYSTAT", max_lag_days=None)
+    for w in warnings:
+        print(f"  ⚠ {w}")
+
+    if len(df) < 50:
+        print(f"  ⚠ 항목 수가 너무 적음 ({len(df)}개). API 키 또는 응답 확인 필요.")
+
+
+if __name__ == "__main__":
+    main()
