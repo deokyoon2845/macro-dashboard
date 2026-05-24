@@ -31,4 +31,5 @@ HEALTH_CHECKS = {
     "market_prices.parquet":   {"max_lag_days": 5,  "min_rows": 1000},
     "kospi_flows.parquet":     {"max_lag_days": 5,  "min_rows": 100},
     "sentiment.parquet":       {"max_lag_days": 3,  "min_rows": 1},
+    "ecos_latest.parquet":     {"max_lag_days": 5,  "min_rows": 50},
 }
