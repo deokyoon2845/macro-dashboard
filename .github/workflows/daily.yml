@@ -29,6 +29,18 @@ jobs:
         run: python src/fetch_fred.py
         continue-on-error: true
 
+      - name: Fetch yfinance data
+        run: python src/fetch_yfinance.py
+        continue-on-error: true
+
+      - name: Fetch PyKRX data
+        run: python src/fetch_pykrx.py
+        continue-on-error: true
+
+      - name: Fetch CNN Fear & Greed
+        run: python src/fetch_sentiment.py
+        continue-on-error: true
+
       - name: Health check + alert
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
