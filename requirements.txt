@@ -4,3 +4,5 @@ pyarrow
 yfinance
 pykrx
 fear-and-greed
+streamlit
+plotly
