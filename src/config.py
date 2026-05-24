@@ -14,3 +14,9 @@ FRED_INDICATORS = {
     "US_CORE_CPI":    "CPILFESL",      # 미국 코어 CPI (월간)
     "US_NFP":         "PAYEMS",        # 미국 비농업 고용 (월간)
 }
+# 헬스체크 기준 (check_health.py가 사용)
+# max_lag_days: 최신 데이터 허용 지연 일수
+# min_rows: 파일에 있어야 할 최소 행 수
+HEALTH_CHECKS = {
+    "fred_indicators.parquet": {"max_lag_days": 10, "min_rows": 1000},
+}
