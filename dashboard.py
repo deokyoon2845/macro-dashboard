@@ -267,7 +267,7 @@ with c1:
     if not cpi.empty:
         cpi = cpi.copy()
         cpi["yoy"] = cpi["value"].pct_change(12) * 100
-        cpi_yoy = cpi.dropna(subset=["yoy"]).rename(columns={"yoy": "value"})
+        cpi_yoy = cpi.dropna(subset=["yoy"])[["date", "yoy"]].rename(columns={"yoy": "value"})
         fig = line_chart([(cpi_yoy, "Core CPI YoY (%)", COLORS["orange"])], "미국 Core CPI YoY")
         fig.add_hline(y=2.0, line_dash="dot", line_color="#374151", line_width=1.5,
                       annotation_text="목표 2%", annotation_font_color="#6B7280",
