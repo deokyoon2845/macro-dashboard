@@ -2,7 +2,7 @@ name: Daily Macro Data Collection
 
 on:
   schedule:
-    - cron: '0 22 * * *'   # 매일 UTC 22:00 = KST 07:00
+    - cron: '0 22 * * *'
   workflow_dispatch:
 
 jobs:
@@ -39,6 +39,12 @@ jobs:
 
       - name: Fetch CNN Fear & Greed
         run: python src/fetch_sentiment.py
+        continue-on-error: true
+
+      - name: Fetch ECOS data
+        env:
+          ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
+        run: python src/fetch_ecos.py
         continue-on-error: true
 
       - name: Health check + alert
