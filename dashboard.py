@@ -1,5 +1,5 @@
 """
-Macro Monitor — v3 (인라인 스타일 기반)
+Macro Monitor — v4 (스파크라인 + F&G 게이지 + 다크모드)
 """
 import streamlit as st
 import pandas as pd
@@ -15,10 +15,11 @@ st.markdown("""
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 html,body,[class*="css"]{background:#070B0F!important;color:#D4DCE8!important;font-family:'JetBrains Mono',monospace!important}
-.block-container{padding:1.5rem 2.5rem 3rem!important;max-width:100%!important}
+.block-container{padding:1.5rem 2.5rem 3rem!important;max-width:100%!important;background:#070B0F!important}
 section[data-testid="stSidebar"]{display:none}
 #MainMenu,footer,header{visibility:hidden}
-div[data-testid="stVerticalBlock"]>div{gap:0!important}
+[data-testid="stAppViewContainer"]{background:#070B0F!important}
+[data-testid="stHeader"]{background:#070B0F!important}
 </style>
 """, unsafe_allow_html=True)
 
@@ -53,6 +54,24 @@ def dlt(df, ind):
     s = ser(df, ind, 15)
     return (s.iloc[-1]["value"] - s.iloc[-2]["value"]) if len(s) >= 2 else None
 
+# ── 스파크라인 SVG ────────────────────────────────────────────
+def spark(df, ind, color="#00E5CC", days=90, w=64, h=26):
+    s = ser(df, ind, days)
+    vals = s["value"].dropna().tolist() if not s.empty else []
+    if len(vals) < 3: return ""
+    mn, mx = min(vals), max(vals)
+    if mn == mx:
+        pts = [(i * w / (len(vals)-1), h/2) for i in range(len(vals))]
+    else:
+        pts = [(i * w / (len(vals)-1), h - (v-mn)/(mx-mn)*h) for i,v in enumerate(vals)]
+    d = "M " + " L ".join(f"{x:.1f},{y:.1f}" for x,y in pts)
+    last_x, last_y = pts[-1]
+    return (f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">'
+            f'<path d="{d}" fill="none" stroke="{color}" stroke-width="1.4" '
+            f'stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>'
+            f'<circle cx="{last_x:.1f}" cy="{last_y:.1f}" r="2" fill="{color}"/>'
+            f'</svg>')
+
 # ── 차트 상수 ─────────────────────────────────────────────────
 P="#0D1520"; B="#070B0F"; G="#0F1923"
 BASE = dict(
@@ -77,7 +96,7 @@ def lc(traces, title="", h=262, zero=False):
     fig.update_layout(title=dict(text=title,font=dict(size=11,color="#6B7280"),x=0),height=h,**BASE)
     return fig
 
-# ── 레짐 계산 ────────────────────────────────────────────────
+# ── 레짐 ─────────────────────────────────────────────────────
 def regime():
     v = lat(market,"VIX"); h = lat(fred,"HY_OAS")
     if v is None or h is None: return "neu","LOADING","데이터 수집 중"
@@ -101,7 +120,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── 레짐 배지 ────────────────────────────────────────────────
 RG = {
     "risk": ("rgba(239,68,68,.12)","#EF4444","rgba(239,68,68,.3)"),
     "on":   ("rgba(0,229,204,.1)", "#00E5CC","rgba(0,229,204,.3)"),
@@ -116,13 +134,13 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── KPI 카드 (st.columns 사용) ───────────────────────────────
-CS = "background:#0D1520;border:1px solid #1A2535;border-radius:8px;padding:11px 13px 10px;font-family:'JetBrains Mono',monospace"
+# ── KPI 카드 ─────────────────────────────────────────────────
+CS = "background:#0D1520;border:1px solid #1A2535;border-radius:8px;padding:11px 12px 10px;font-family:'JetBrains Mono',monospace"
 LS = "font-size:9px;color:#4E5F74;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px"
-VS = "font-size:17px;font-weight:600;color:#fff;line-height:1.2;margin-bottom:3px"
+VS = "font-size:18px;font-weight:600;color:#fff;line-height:1.2;margin-bottom:3px"
 DS = "font-size:9px;font-weight:500"
 
-def kcard(label, ind, df, fmt=".2f", inv=False):
+def kcard(label, ind, df, fmt=".2f", inv=False, spk_color="#00E5CC"):
     r = lat(df, ind)
     if r is None:
         return f'<div style="{CS}"><div style="{LS}">{label}</div><div style="{VS}">—</div></div>'
@@ -132,7 +150,18 @@ def kcard(label, ind, df, fmt=".2f", inv=False):
         dh = f'<div style="{DS};color:{clr}">{"+" if d>0 else ""}{d:.2f}</div>'
     else:
         dh = f'<div style="{DS};color:#4E5F74">—</div>'
-    return f'<div style="{CS}"><div style="{LS}">{label}</div><div style="{VS}">{vs}</div>{dh}</div>'
+    spk_html = spark(df, ind, color=spk_color)
+    spk_div = f'<div style="opacity:.55;margin-top:2px">{spk_html}</div>' if spk_html else ""
+    return f'''<div style="{CS}">
+        <div style="{LS}">{label}</div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end">
+            <div>
+                <div style="{VS}">{vs}</div>
+                {dh}
+            </div>
+            {spk_div}
+        </div>
+    </div>'''
 
 def fgcard():
     r = lat(sentiment, "FEAR_GREED")
@@ -144,27 +173,37 @@ def fgcard():
     elif v<55: c,t="#EAB308","중립"
     elif v<75: c,t="#84CC16","탐욕"
     else:      c,t="#22C55E","극도 탐욕"
-    badge = f'<span style="background:{c}20;color:{c};border:1px solid {c}40;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase">{v:.0f} · {t}</span>'
-    return f'<div style="{CS}"><div style="{LS}">공포탐욕</div><div style="{VS}">{v:.0f}</div>{badge}</div>'
+    badge = f'<span style="background:{c}20;color:{c};border:1px solid {c}40;padding:1px 5px;border-radius:3px;font-size:8px;font-weight:600;letter-spacing:1px;text-transform:uppercase">{t}</span>'
+    spk_html = spark(sentiment, "FEAR_GREED", color=c)
+    spk_div = f'<div style="opacity:.55;margin-top:2px">{spk_html}</div>' if spk_html else ""
+    return f'''<div style="{CS}">
+        <div style="{LS}">공포탐욕</div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end">
+            <div>
+                <div style="{VS}">{v:.0f}</div>
+                {badge}
+            </div>
+            {spk_div}
+        </div>
+    </div>'''
 
 kpi_specs = [
-    ("VIX",     "VIX",    market, ".1f",  True),
-    ("SOX",     "SOX",    market, ",.0f", False),
-    ("S&P 500", "SPX",    market, ",.0f", False),
-    ("KOSPI",   "KOSPI",  market, ",.0f", False),
-    ("USD/KRW", "USDKRW", market, ",.0f", True),
-    ("US 10Y",  "US_10Y", fred,   ".2f",  True),
-    ("HY OAS",  "HY_OAS", fred,   ".2f",  True),
+    ("VIX",     "VIX",    market, ".1f",  True,  "#EF4444"),
+    ("SOX",     "SOX",    market, ",.0f", False, "#3B82F6"),
+    ("S&P 500", "SPX",    market, ",.0f", False, "#8B5CF6"),
+    ("KOSPI",   "KOSPI",  market, ",.0f", False, "#00E5CC"),
+    ("USD/KRW", "USDKRW", market, ",.0f", True,  "#F97316"),
+    ("US 10Y",  "US_10Y", fred,   ".2f",  True,  "#3B82F6"),
+    ("HY OAS",  "HY_OAS", fred,   ".2f",  True,  "#F59E0B"),
 ]
 
 kcols = st.columns(8)
-for col,(lbl,ind,df,fmt,inv) in zip(kcols, kpi_specs):
+for col,(lbl,ind,df,fmt,inv,spk_c) in zip(kcols, kpi_specs):
     with col:
-        st.markdown(kcard(lbl,ind,df,fmt,inv), unsafe_allow_html=True)
+        st.markdown(kcard(lbl,ind,df,fmt,inv,spk_c), unsafe_allow_html=True)
 with kcols[7]:
     st.markdown(fgcard(), unsafe_allow_html=True)
 
-# ── 섹션 헤더 헬퍼 ──────────────────────────────────────────
 def sh(id_, name):
     st.markdown(f"""
 <div style="display:flex;align-items:center;gap:10px;margin:28px 0 12px;font-family:'JetBrains Mono',monospace">
@@ -173,7 +212,7 @@ def sh(id_, name):
   <div style="flex:1;height:1px;background:#1A2535"></div>
 </div>""", unsafe_allow_html=True)
 
-# ── A
+# ── A: 위험·심리 ──────────────────────────────────────────────
 sh("A","글로벌 위험 & 심리")
 c1,c2 = st.columns(2)
 with c1:
@@ -181,44 +220,60 @@ with c1:
              "VIX · HY 신용스프레드")
     fig.add_hrect(y0=25,y1=100,fillcolor="rgba(239,68,68,0.03)",line_width=0)
     st.plotly_chart(fig, use_container_width=True)
-with c2:
-    fg_s=ser(sentiment,"FEAR_GREED"); sp_s=ser(fred,"T10Y2Y_SPREAD")
-    fig = make_subplots(specs=[[{"secondary_y":True}]])
-    AX = dict(showgrid=True,gridcolor=G,zeroline=False,showline=False,tickfont=dict(size=9))
-    if not fg_s.empty:
-        fig.add_trace(go.Scatter(x=fg_s["date"],y=fg_s["value"],name="공포탐욕",
-            line=dict(color="#3B82F6",width=1.8),
-            hovertemplate="<b>공포탐욕</b> %{y:.0f}<extra></extra>"),secondary_y=False)
-        fig.add_hrect(y0=0,y1=25,fillcolor="rgba(239,68,68,0.04)",line_width=0)
-        fig.add_hrect(y0=75,y1=100,fillcolor="rgba(34,197,94,0.04)",line_width=0)
-    if not sp_s.empty:
-        fig.add_trace(go.Scatter(x=sp_s["date"],y=sp_s["value"],name="2Y-10Y %",
-            line=dict(color="#F59E0B",width=1.5,dash="dot"),
-            hovertemplate="<b>스프레드</b> %{y:.2f}%<extra></extra>"),secondary_y=True)
-    fig.add_hline(y=0,line_dash="dot",line_color="#243550",line_width=1,secondary_y=True)
-    fig.update_layout(
-        title=dict(text="공포탐욕지수 · 금리 스프레드",font=dict(size=11,color="#6B7280"),x=0),
-        height=262, paper_bgcolor=P, plot_bgcolor=B,
-        font=dict(family="JetBrains Mono",size=10,color="#4E5F74"),
-        margin=dict(l=6,r=6,t=30,b=6),
-        legend=dict(orientation="h",y=1.1,x=0,font=dict(size=9,color="#6B7280"),bgcolor="rgba(0,0,0,0)"),
-        hovermode="x unified", xaxis=AX)
-    fig.update_yaxes(showgrid=True,gridcolor=G,zeroline=False,showline=False,tickfont=dict(size=9),secondary_y=False)
-    fig.update_yaxes(showgrid=False,zeroline=False,showline=False,tickfont=dict(size=9,color="#F59E0B"),secondary_y=True)
-    st.plotly_chart(fig, use_container_width=True)
 
-# ── B
+with c2:
+    # F&G 게이지 — 데이터 포인트 수 무관하게 항상 현재값 표시
+    fg_row = lat(sentiment, "FEAR_GREED")
+    if fg_row is not None:
+        fv = fg_row["value"]
+        if fv<25:   fc,fl="#EF4444","극도의 공포"
+        elif fv<45: fc,fl="#F97316","공포"
+        elif fv<55: fc,fl="#EAB308","중립"
+        elif fv<75: fc,fl="#84CC16","탐욕"
+        else:       fc,fl="#22C55E","극도의 탐욕"
+
+        fig = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=fv,
+            domain={"x":[0,1],"y":[0,1]},
+            number={"font":{"size":42,"family":"JetBrains Mono","color":fc}},
+            title={"text":fl,"font":{"size":13,"family":"Syne","color":fc}},
+            gauge={
+                "axis":{"range":[0,100],"tickwidth":0,"tickvals":[0,25,50,75,100],
+                        "tickfont":{"size":9,"color":"#4E5F74"}},
+                "bar":{"color":fc,"thickness":0.22},
+                "bgcolor":"#0D1520","borderwidth":0,
+                "steps":[
+                    {"range":[0,25],  "color":"rgba(239,68,68,0.15)"},
+                    {"range":[25,45], "color":"rgba(249,115,22,0.12)"},
+                    {"range":[45,55], "color":"rgba(234,179,8,0.12)"},
+                    {"range":[55,75], "color":"rgba(132,204,22,0.12)"},
+                    {"range":[75,100],"color":"rgba(34,197,94,0.15)"},
+                ],
+                "threshold":{"line":{"color":"#fff","width":2},"thickness":0.7,"value":fv},
+            },
+        ))
+        fig.update_layout(paper_bgcolor="#0D1520",height=262,
+                          margin=dict(l=30,r=30,t=20,b=20),
+                          font=dict(family="JetBrains Mono",color="#4E5F74"))
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("공포탐욕지수 데이터 수집 중")
+
+# ── B: 금리·달러 ─────────────────────────────────────────────
 sh("B","미국 금리 & 달러")
 c1,c2 = st.columns(2)
 with c1:
-    fig = lc([(ser(fred,"US_10Y"),"US 10Y %","#3B82F6"),(ser(fred,"T10Y2Y_SPREAD"),"2Y-10Y %","#F59E0B")],
-             "미국 국채금리",zero=True)
+    fig = lc([(ser(fred,"US_10Y"),"US 10Y %","#3B82F6"),
+              (ser(fred,"T10Y2Y_SPREAD"),"2Y-10Y 스프레드","#F59E0B")],
+             "미국 국채금리 · 스프레드",zero=True)
     fig.add_hrect(y0=4.5,y1=10,fillcolor="rgba(245,158,11,0.03)",line_width=0)
     st.plotly_chart(fig, use_container_width=True)
 with c2:
-    st.plotly_chart(lc([(ser(market,"DXY"),"DXY","#8B5CF6")],"DXY 달러 인덱스"), use_container_width=True)
+    st.plotly_chart(lc([(ser(market,"DXY"),"DXY","#8B5CF6")],"DXY 달러 인덱스"),
+                    use_container_width=True)
 
-# ── C
+# ── C: 한국 시장 ─────────────────────────────────────────────
 sh("C","한국 시장")
 c1,c2 = st.columns(2)
 with c1:
@@ -226,17 +281,20 @@ with c1:
     fig.add_hrect(y0=1400,y1=2500,fillcolor="rgba(239,68,68,0.03)",line_width=0)
     st.plotly_chart(fig, use_container_width=True)
 with c2:
-    st.plotly_chart(lc([(ser(market,"KOSPI"),"KOSPI","#00E5CC")],"KOSPI"), use_container_width=True)
+    st.plotly_chart(lc([(ser(market,"KOSPI"),"KOSPI","#00E5CC")],"KOSPI"),
+                    use_container_width=True)
 
-# ── D
+# ── D: 글로벌 모멘텀 ─────────────────────────────────────────
 sh("D","글로벌 주식 모멘텀")
 c1,c2 = st.columns(2)
 with c1:
-    st.plotly_chart(lc([(ser(market,"SOX"),"SOX 반도체","#3B82F6")],"필라델피아 반도체 (SOX)"), use_container_width=True)
+    st.plotly_chart(lc([(ser(market,"SOX"),"SOX 반도체","#3B82F6")],
+                       "필라델피아 반도체 (SOX)"), use_container_width=True)
 with c2:
-    st.plotly_chart(lc([(ser(market,"SPX"),"S&P 500","#8B5CF6")],"S&P 500"), use_container_width=True)
+    st.plotly_chart(lc([(ser(market,"SPX"),"S&P 500","#8B5CF6")],"S&P 500"),
+                    use_container_width=True)
 
-# ── E
+# ── E: 미국 월간 매크로 ──────────────────────────────────────
 sh("E","미국 월간 매크로")
 c1,c2 = st.columns(2)
 with c1:
@@ -255,47 +313,44 @@ with c2:
     if not nfp.empty:
         nfp = nfp.copy(); nfp["mom"] = nfp["value"].diff()
         nm = nfp.dropna(subset=["mom"])
+        nl = {k:v for k,v in BASE.items() if k!="legend"}
         fig = go.Figure(go.Bar(x=nm["date"],y=nm["mom"],
             marker_color=["#22C55E" if v>=0 else "#EF4444" for v in nm["mom"]],
             hovertemplate="<b>NFP MoM</b> %{y:,.0f}천명<extra></extra>"))
-        nl = {k:v for k,v in BASE.items() if k!="legend"}
-        fig.update_layout(title=dict(text="비농업 고용 MoM (천명)",font=dict(size=11,color="#6B7280"),x=0),
+        fig.update_layout(title=dict(text="비농업 고용 MoM (천명)",
+                          font=dict(size=11,color="#6B7280"),x=0),
                           height=262,showlegend=False,**nl)
         st.plotly_chart(fig, use_container_width=True)
 
-# ── F
+# ── F: ECOS ──────────────────────────────────────────────────
 sh("F","한국 매크로 · ECOS")
 if ecos.empty:
     st.info("ECOS 데이터 없음")
 else:
-    cols_list = [c for c in ["CLASS_NAME","KEYSTAT_NAME","DATA_VALUE","UNIT_NAME","CYCLE"] if c in ecos.columns]
+    cols_list=[c for c in ["CLASS_NAME","KEYSTAT_NAME","DATA_VALUE","UNIT_NAME","CYCLE"] if c in ecos.columns]
     if cols_list:
-        rows = ""
+        rows=""
         for _,r in ecos[cols_list].iterrows():
-            rows += (f'<tr>'
-                     f'<td style="padding:.4rem .85rem;font-size:10px;color:#4E5F74;border-bottom:1px solid rgba(26,37,53,.5)">{r.get("CLASS_NAME","")}</td>'
-                     f'<td style="padding:.4rem .85rem;font-size:11px;color:#D4DCE8;border-bottom:1px solid rgba(26,37,53,.5)">{r.get("KEYSTAT_NAME","")}</td>'
-                     f'<td style="padding:.4rem .85rem;font-size:11px;font-weight:600;color:#fff;text-align:right;border-bottom:1px solid rgba(26,37,53,.5)">{r.get("DATA_VALUE","")}</td>'
-                     f'<td style="padding:.4rem .85rem;font-size:10px;color:#4E5F74;text-align:right;border-bottom:1px solid rgba(26,37,53,.5)">{r.get("UNIT_NAME","")}</td>'
-                     f'<td style="padding:.4rem .85rem;font-size:10px;color:#4E5F74;text-align:right;border-bottom:1px solid rgba(26,37,53,.5)">{r.get("CYCLE","")}</td>'
-                     f'</tr>')
+            rows+=(f'<tr>'
+                   f'<td style="padding:.4rem .85rem;font-size:10px;color:#4E5F74;border-bottom:1px solid rgba(26,37,53,.5)">{r.get("CLASS_NAME","")}</td>'
+                   f'<td style="padding:.4rem .85rem;font-size:11px;color:#D4DCE8;border-bottom:1px solid rgba(26,37,53,.5)">{r.get("KEYSTAT_NAME","")}</td>'
+                   f'<td style="padding:.4rem .85rem;font-size:11px;font-weight:600;color:#fff;text-align:right;border-bottom:1px solid rgba(26,37,53,.5)">{r.get("DATA_VALUE","")}</td>'
+                   f'<td style="padding:.4rem .85rem;font-size:10px;color:#4E5F74;text-align:right;border-bottom:1px solid rgba(26,37,53,.5)">{r.get("UNIT_NAME","")}</td>'
+                   f'<td style="padding:.4rem .85rem;font-size:10px;color:#4E5F74;text-align:right;border-bottom:1px solid rgba(26,37,53,.5)">{r.get("CYCLE","")}</td>'
+                   f'</tr>')
         st.markdown(f"""
 <div style="background:#0D1520;border:1px solid #1A2535;border-radius:8px;overflow:hidden;font-family:'JetBrains Mono',monospace">
 <table style="width:100%;border-collapse:collapse">
-  <thead>
-    <tr style="background:#111D2E">
-      <th style="padding:.55rem .85rem;text-align:left;font-size:9px;color:#4E5F74;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;border-bottom:1px solid #1A2535;width:18%">분류</th>
-      <th style="padding:.55rem .85rem;text-align:left;font-size:9px;color:#4E5F74;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;border-bottom:1px solid #1A2535;width:42%">지표명</th>
-      <th style="padding:.55rem .85rem;text-align:right;font-size:9px;color:#4E5F74;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;border-bottom:1px solid #1A2535;width:15%">현재값</th>
-      <th style="padding:.55rem .85rem;text-align:right;font-size:9px;color:#4E5F74;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;border-bottom:1px solid #1A2535;width:12%">단위</th>
-      <th style="padding:.55rem .85rem;text-align:right;font-size:9px;color:#4E5F74;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;border-bottom:1px solid #1A2535;width:8%">주기</th>
-    </tr>
-  </thead>
+  <thead><tr style="background:#111D2E">
+    <th style="padding:.55rem .85rem;text-align:left;font-size:9px;color:#4E5F74;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;border-bottom:1px solid #1A2535;width:18%">분류</th>
+    <th style="padding:.55rem .85rem;text-align:left;font-size:9px;color:#4E5F74;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;border-bottom:1px solid #1A2535;width:42%">지표명</th>
+    <th style="padding:.55rem .85rem;text-align:right;font-size:9px;color:#4E5F74;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;border-bottom:1px solid #1A2535;width:15%">현재값</th>
+    <th style="padding:.55rem .85rem;text-align:right;font-size:9px;color:#4E5F74;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;border-bottom:1px solid #1A2535;width:12%">단위</th>
+    <th style="padding:.55rem .85rem;text-align:right;font-size:9px;color:#4E5F74;letter-spacing:1.5px;text-transform:uppercase;font-weight:500;border-bottom:1px solid #1A2535;width:8%">주기</th>
+  </tr></thead>
   <tbody>{rows}</tbody>
-</table>
-</div>""", unsafe_allow_html=True)
+</table></div>""", unsafe_allow_html=True)
 
-# ── 푸터
 st.markdown("""
 <div style="margin-top:2.5rem;padding-top:.85rem;border-top:1px solid #1A2535;font-size:10px;color:#4E5F74;text-align:center;letter-spacing:1px;font-family:'JetBrains Mono',monospace">
   FRED &nbsp;·&nbsp; yfinance &nbsp;·&nbsp; CNN Fear &amp; Greed &nbsp;·&nbsp; 한국은행 ECOS &nbsp;·&nbsp; 매일 KST 07:00 자동 수집
