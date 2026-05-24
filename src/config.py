@@ -14,9 +14,21 @@ FRED_INDICATORS = {
     "US_CORE_CPI":    "CPILFESL",      # 미국 코어 CPI (월간)
     "US_NFP":         "PAYEMS",        # 미국 비농업 고용 (월간)
 }
+# yfinance 티커
+# 형식: 우리 이름 -> (ticker, sanity check 값 범위)
+YFINANCE_TICKERS = {
+    "VIX":    ("^VIX",     (5.0,   100.0)),     # 변동성 지수
+    "SOX":    ("^SOX",     (500.0, 8000.0)),    # 필라델피아 반도체
+    "DXY":    ("DX-Y.NYB", (80.0,  130.0)),     # 달러 인덱스
+    "USDKRW": ("KRW=X",    (900.0, 2000.0)),    # 원달러 환율
+    "KOSPI":  ("^KS11",    (1000.0,5000.0)),    # KOSPI
+    "SPX":    ("^GSPC",    (1000.0,10000.0)),   # S&P 500
+}
+
 # 헬스체크 기준 (check_health.py가 사용)
-# max_lag_days: 최신 데이터 허용 지연 일수
-# min_rows: 파일에 있어야 할 최소 행 수
 HEALTH_CHECKS = {
     "fred_indicators.parquet": {"max_lag_days": 10, "min_rows": 1000},
+    "market_prices.parquet":   {"max_lag_days": 5,  "min_rows": 1000},
+    "kospi_flows.parquet":     {"max_lag_days": 5,  "min_rows": 100},
+    "sentiment.parquet":       {"max_lag_days": 3,  "min_rows": 1},
 }
