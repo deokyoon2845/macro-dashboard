@@ -1,3 +1,6 @@
 pandas
 requests
 pyarrow
+yfinance
+pykrx
+fear-and-greed
