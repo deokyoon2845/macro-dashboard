@@ -177,8 +177,8 @@ def fg_pill(v):
     return f'<div class="fg-p" style="background:{c}18;color:{c};border:1px solid {c}40">{v:.0f} · {t}</div>'
 
 fg_r = lat(sentiment,"FEAR_GREED")
-fg_b = fg_pill(fg_r["value"]) if fg_r else '<div class="kd nu">—</div>'
-fg_v = f'{fg_r["value"]:.0f}' if fg_r else "—"
+fg_b = fg_pill(fg_r["value"]) if fg_r is not None else '<div class="kd nu">—</div>'
+fg_v = f'{fg_r["value"]:.0f}' if fg_r is not None else "—"
 
 st.markdown(f"""
 <div class="kg">
