@@ -1,7 +1,6 @@
 """
-Macro Monitor — 한미 매크로 모니터링 대시보드
+Macro Monitor — v2
 """
-
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -9,72 +8,75 @@ from plotly.subplots import make_subplots
 from pathlib import Path
 from datetime import datetime
 
-# ── 페이지 설정 ──────────────────────────────────────────────
-st.set_page_config(
-    page_title="Macro Monitor",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
+st.set_page_config(page_title="Macro Monitor", page_icon="◈",
+                   layout="wide", initial_sidebar_state="collapsed")
 
-# ── 스타일 ───────────────────────────────────────────────────
 st.markdown("""
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+:root {
+  --bg:#070B0F; --s1:#0D1520; --s2:#111D2E;
+  --b1:#1A2535; --b2:#243550;
+  --t1:#D4DCE8; --t2:#8B98A8; --t3:#4E5F74;
+  --cy:#00E5CC; --am:#F59E0B; --rd:#EF4444;
+  --gn:#22C55E; --bl:#3B82F6; --pu:#8B5CF6; --or:#F97316;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body,[class*="css"]{background:var(--bg)!important;color:var(--t1)!important;font-family:'JetBrains Mono',monospace!important}
+.block-container{padding:1.5rem 2.5rem 3rem!important;max-width:100%!important}
+section[data-testid="stSidebar"]{display:none}
+#MainMenu,footer,header{visibility:hidden}
 
-.main-title {
-    font-size: 1.7rem; font-weight: 700; color: #FAFAFA;
-    margin-bottom: 0.1rem;
-}
-.main-sub {
-    font-size: 0.82rem; color: #6B7280; margin-bottom: 1.8rem;
-}
-.section-label {
-    font-size: 0.72rem; font-weight: 600; color: #6B7280;
-    text-transform: uppercase; letter-spacing: 0.1em;
-    margin: 1.8rem 0 0.7rem 0;
-    padding-bottom: 0.4rem;
-    border-bottom: 1px solid #1F2937;
-}
-div[data-testid="stMetric"] {
-    background: #111827;
-    border: 1px solid #1F2937;
-    border-radius: 10px;
-    padding: 0.9rem 1.1rem;
-}
-div[data-testid="stMetricValue"] > div {
-    font-size: 1.35rem !important;
-    font-weight: 600 !important;
-}
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
+.db-hdr{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:1.1rem;border-bottom:1px solid var(--b1);margin-bottom:1.3rem}
+.db-ttl{font-family:'Syne',sans-serif;font-size:1.55rem;font-weight:800;color:#fff;letter-spacing:-.025em}
+.db-ttl em{color:var(--cy);font-style:normal}
+.db-meta{font-size:.68rem;color:var(--t3);text-align:right;line-height:2;letter-spacing:.04em}
+
+.rg-row{display:flex;align-items:center;gap:.7rem;margin-bottom:1.3rem}
+.rg-lbl{font-size:.63rem;color:var(--t3);letter-spacing:.12em}
+.rg-b{padding:.2rem .65rem;border-radius:3px;font-size:.66rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+.r-risk{background:rgba(239,68,68,.12);color:#EF4444;border:1px solid rgba(239,68,68,.3)}
+.r-neu{background:rgba(245,158,11,.12);color:#F59E0B;border:1px solid rgba(245,158,11,.3)}
+.r-on{background:rgba(0,229,204,.1);color:#00E5CC;border:1px solid rgba(0,229,204,.3)}
+.rg-note{font-size:.67rem;color:var(--t3)}
+
+.kg{display:grid;grid-template-columns:repeat(8,1fr);gap:.5rem;margin-bottom:1.5rem}
+.kc{background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:.75rem .8rem .65rem;transition:border-color .15s;cursor:default}
+.kc:hover{border-color:var(--b2)}
+.kl{font-size:.58rem;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.28rem}
+.kv{font-size:1.1rem;font-weight:600;color:#fff;line-height:1.2}
+.kd{font-size:.6rem;font-weight:500;margin-top:.15rem}
+.up{color:var(--rd)} .dn{color:var(--cy)}
+.iu{color:var(--cy)} .id{color:var(--rd)}
+.nu{color:var(--t3)}
+
+.fg-p{display:inline-block;padding:.1rem .45rem;border-radius:3px;font-size:.58rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-top:.15rem}
+
+.sh{display:flex;align-items:center;gap:.6rem;margin:1.9rem 0 .8rem}
+.sh-id{font-family:'Syne',sans-serif;font-size:.6rem;font-weight:700;color:var(--bg);background:var(--cy);padding:.1rem .42rem;border-radius:3px;letter-spacing:.04em}
+.sh-nm{font-family:'Syne',sans-serif;font-size:.8rem;font-weight:600;color:var(--t2);letter-spacing:.03em}
+.sh-ln{flex:1;height:1px;background:var(--b1)}
+
+.ew{background:var(--s1);border:1px solid var(--b1);border-radius:8px;overflow:hidden}
+.et{width:100%;border-collapse:collapse;font-size:.7rem}
+.et thead th{background:var(--s2);color:var(--t3);font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;padding:.55rem .85rem;text-align:left;font-weight:500;border-bottom:1px solid var(--b1)}
+.et tbody td{padding:.4rem .85rem;border-bottom:1px solid rgba(26,37,53,.55);color:var(--t1)}
+.et tbody tr:last-child td{border-bottom:none}
+.et tbody tr:hover td{background:rgba(17,29,46,.55)}
+.ev{font-weight:600;color:#fff;text-align:right}
+.eu{color:var(--t3);font-size:.6rem;text-align:right}
+.ec{color:var(--t3);font-size:.6rem}
+
+.db-ft{margin-top:2.5rem;padding-top:.85rem;border-top:1px solid var(--b1);font-size:.6rem;color:var(--t3);text-align:center;letter-spacing:.06em}
 </style>
 """, unsafe_allow_html=True)
 
-# ── 상수 ─────────────────────────────────────────────────────
-DATA_DIR   = Path(__file__).parent / "data"
-BG         = "#0D1117"
-CHART_BG   = "#111827"
-GRID       = "#1F2937"
-COLORS     = {
-    "blue":   "#3B82F6",
-    "green":  "#10B981",
-    "red":    "#EF4444",
-    "amber":  "#F59E0B",
-    "purple": "#8B5CF6",
-    "teal":   "#14B8A6",
-    "orange": "#F97316",
-    "gray":   "#6B7280",
-}
+DATA_DIR = Path(__file__).parent / "data"
 
-# ── 데이터 로드 ───────────────────────────────────────────────
 @st.cache_data(ttl=3600)
-def load(filename):
-    f = DATA_DIR / filename
-    if not f.exists():
-        return pd.DataFrame()
+def load(fn):
+    f = DATA_DIR / fn
+    if not f.exists(): return pd.DataFrame()
     df = pd.read_parquet(f)
     if "date" in df.columns:
         df["date"] = pd.to_datetime(df["date"])
@@ -85,238 +87,230 @@ market    = load("market_prices.parquet")
 sentiment = load("sentiment.parquet")
 ecos      = load("ecos_latest.parquet")
 
-def get_latest(df, indicator):
+def lat(df, ind):
     if df.empty: return None
-    sub = df[df["indicator"] == indicator].sort_values("date")
-    return sub.iloc[-1] if not sub.empty else None
+    s = df[df["indicator"]==ind].sort_values("date")
+    return s.iloc[-1] if not s.empty else None
 
-def get_series(df, indicator, days=365):
+def ser(df, ind, days=365):
     if df.empty: return pd.DataFrame()
-    sub = df[df["indicator"] == indicator].copy()
-    if days:
-        sub = sub[sub["date"] >= pd.Timestamp.now() - pd.Timedelta(days=days)]
-    return sub.sort_values("date")
+    s = df[df["indicator"]==ind].copy()
+    if days: s = s[s["date"] >= pd.Timestamp.now()-pd.Timedelta(days=days)]
+    return s.sort_values("date")
 
-def line_chart(traces, title="", height=270, zero_line=False):
-    """traces: [(df, name, color), ...]"""
-    fig = go.Figure()
-    for df, name, color in traces:
-        if df.empty: continue
-        fig.add_trace(go.Scatter(
-            x=df["date"], y=df["value"], name=name,
-            line=dict(color=color, width=2),
-            hovertemplate=f"<b>{name}</b><br>%{{x|%Y-%m-%d}}<br>%{{y:.2f}}<extra></extra>",
-        ))
-    if zero_line:
-        fig.add_hline(y=0, line_dash="dot", line_color="#374151", line_width=1)
-    fig.update_layout(
-        title=dict(text=title, font=dict(size=12, color="#9CA3AF"), x=0),
-        template="plotly_dark", paper_bgcolor=CHART_BG, plot_bgcolor=CHART_BG,
-        height=height, margin=dict(l=8, r=8, t=36, b=8),
-        legend=dict(orientation="h", y=1.08, x=0, font=dict(size=10),
-                    bgcolor="rgba(0,0,0,0)"),
-        xaxis=dict(showgrid=True, gridcolor=GRID, gridwidth=1, zeroline=False),
-        yaxis=dict(showgrid=True, gridcolor=GRID, gridwidth=1, zeroline=False),
-        hovermode="x unified",
-    )
-    return fig
+def dlt(df, ind):
+    s = ser(df, ind, 15)
+    return (s.iloc[-1]["value"] - s.iloc[-2]["value"]) if len(s) >= 2 else None
 
-# ── 헤더 ─────────────────────────────────────────────────────
-st.markdown('<div class="main-title">📊 Macro Monitor</div>', unsafe_allow_html=True)
-st.markdown(
-    f'<div class="main-sub">한미 매크로 모니터링 · 업데이트: {datetime.now().strftime("%Y-%m-%d")}'
-    f' · 매일 KST 07:00 자동 수집</div>',
-    unsafe_allow_html=True,
+P="#0D1520"; B="#070B0F"; G="#0F1923"
+
+BASE = dict(
+    paper_bgcolor=P, plot_bgcolor=B,
+    font=dict(family="JetBrains Mono", size=10, color="#4E5F74"),
+    margin=dict(l=6,r=6,t=30,b=6),
+    legend=dict(orientation="h",y=1.1,x=0,font=dict(size=9,color="#6B7280"),bgcolor="rgba(0,0,0,0)"),
+    hovermode="x unified",
+    hoverlabel=dict(bgcolor="#111D2E",bordercolor="#243550",font=dict(family="JetBrains Mono",size=11)),
+    xaxis=dict(showgrid=True,gridcolor=G,gridwidth=1,zeroline=False,showline=False,tickfont=dict(size=9)),
+    yaxis=dict(showgrid=True,gridcolor=G,gridwidth=1,zeroline=False,showline=False,tickfont=dict(size=9)),
 )
 
-# ── KPI 메트릭 ────────────────────────────────────────────────
-st.markdown('<div class="section-label">핵심 지표 현재값</div>', unsafe_allow_html=True)
+def lc(traces, title="", h=262, zero=False):
+    fig = go.Figure()
+    for df,nm,clr in traces:
+        if df.empty: continue
+        fig.add_trace(go.Scatter(x=df["date"],y=df["value"],name=nm,
+            line=dict(color=clr,width=1.8),
+            hovertemplate=f"<b>{nm}</b> %{{y:.2f}}<extra></extra>"))
+    if zero: fig.add_hline(y=0,line_dash="dot",line_color="#243550",line_width=1)
+    fig.update_layout(title=dict(text=title,font=dict(size=11,color="#6B7280"),x=0),height=h,**BASE)
+    return fig
 
-kpi_list = [
-    ("VIX",           "📉 VIX",         market,    False, ".1f"),
-    ("FEAR_GREED",    "😨 공포탐욕",     sentiment, False, ".0f"),
-    ("HY_OAS",        "💳 HY스프레드",  fred,      False, ".2f"),
-    ("US_10Y",        "🏦 미국10Y(%)",  fred,      False, ".2f"),
-    ("T10Y2Y_SPREAD", "📐 2Y-10Y",     fred,      True,  ".2f"),
-    ("DXY",           "💵 DXY",         market,    False, ".1f"),
-    ("USDKRW",        "🇰🇷 USD/KRW",  market,    False, ",.0f"),
-    ("SOX",           "🔵 SOX",         market,    False, ",.0f"),
-]
+def sh(id_, name):
+    st.markdown(f'<div class="sh"><span class="sh-id">{id_}</span>'
+                f'<span class="sh-nm">{name}</span><div class="sh-ln"></div></div>',
+                unsafe_allow_html=True)
 
-cols = st.columns(8)
-for col, (ind, label, df, inverse, fmt) in zip(cols, kpi_list):
-    row = get_latest(df, ind)
-    with col:
-        if row is not None:
-            val = row["value"]
-            series = get_series(df, ind, days=10)
-            delta = None
-            if len(series) >= 2:
-                prev = series.iloc[-2]["value"]
-                delta = f"{val - prev:+.2f}"
-            st.metric(
-                label=label,
-                value=format(val, fmt),
-                delta=delta,
-                delta_color="inverse" if inverse else "normal",
-            )
-        else:
-            st.metric(label=label, value="—")
+def regime():
+    v = lat(market,"VIX"); h = lat(fred,"HY_OAS")
+    if not v or not h: return "neu","LOADING","데이터 수집 중"
+    vv,hv = v["value"],h["value"]
+    if vv>28 or hv>5.5:   return "risk","RISK-OFF",f"VIX {vv:.1f} · HY {hv:.2f}% — 위험 회피 국면"
+    elif vv<16 and hv<3.5: return "on","RISK-ON", f"VIX {vv:.1f} · HY {hv:.2f}% — 위험 선호 국면"
+    else:                  return "neu","NEUTRAL", f"VIX {vv:.1f} · HY {hv:.2f}% — 관망 국면"
 
-# ── Section A: 위험·심리 ──────────────────────────────────────
-st.markdown('<div class="section-label">A · 글로벌 위험 & 심리</div>', unsafe_allow_html=True)
-c1, c2 = st.columns(2)
+rc,rt,rn = regime()
 
+st.markdown(f"""
+<div class="db-hdr">
+  <div class="db-ttl">◈ MACRO <em>MONITOR</em></div>
+  <div class="db-meta">{datetime.now().strftime("%Y-%m-%d")} &nbsp;·&nbsp; 매일 KST 07:00 자동 수집<br>FRED · yfinance · CNN · ECOS</div>
+</div>
+<div class="rg-row">
+  <span class="rg-lbl">REGIME</span>
+  <span class="rg-b r-{rc}">● {rt}</span>
+  <span class="rg-note">{rn}</span>
+</div>
+""", unsafe_allow_html=True)
+
+def kc(label, ind, df, fmt=".2f", inv=False, badge=None):
+    r = lat(df, ind)
+    if r is None:
+        return f'<div class="kc"><div class="kl">{label}</div><div class="kv">—</div></div>'
+    val = r["value"]; d = dlt(df, ind)
+    vs = format(val, fmt)
+    if badge:
+        dh = badge
+    elif d is not None:
+        cls = ("iu" if d>0 else "id") if inv else ("up" if d>0 else "dn")
+        dh = f'<div class="kd {cls}">{"+" if d>0 else ""}{d:.2f}</div>'
+    else:
+        dh = '<div class="kd nu">—</div>'
+    return f'<div class="kc"><div class="kl">{label}</div><div class="kv">{vs}</div>{dh}</div>'
+
+def fg_pill(v):
+    if v<25:   c,t="#EF4444","극도 공포"
+    elif v<45: c,t="#F97316","공포"
+    elif v<55: c,t="#EAB308","중립"
+    elif v<75: c,t="#84CC16","탐욕"
+    else:      c,t="#22C55E","극도 탐욕"
+    return f'<div class="fg-p" style="background:{c}18;color:{c};border:1px solid {c}40">{v:.0f} · {t}</div>'
+
+fg_r = lat(sentiment,"FEAR_GREED")
+fg_b = fg_pill(fg_r["value"]) if fg_r else '<div class="kd nu">—</div>'
+fg_v = f'{fg_r["value"]:.0f}' if fg_r else "—"
+
+st.markdown(f"""
+<div class="kg">
+  {kc("VIX","VIX",market,".1f",inv=True)}
+  {kc("SOX","SOX",market,",.0f")}
+  {kc("S&P 500","SPX",market,",.0f")}
+  {kc("KOSPI","KOSPI",market,",.0f")}
+  {kc("USD / KRW","USDKRW",market,",.0f",inv=True)}
+  {kc("US 10Y","US_10Y",fred,".2f",inv=True)}
+  {kc("HY OAS","HY_OAS",fred,".2f",inv=True)}
+  <div class="kc">
+    <div class="kl">공포탐욕</div>
+    <div class="kv">{fg_v}</div>
+    {fg_b}
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+# ── A
+sh("A","글로벌 위험 & 심리")
+c1,c2 = st.columns(2)
 with c1:
-    vix = get_series(market, "VIX")
-    hy  = get_series(fred,   "HY_OAS")
-    fig = line_chart([
-        (vix, "VIX",           COLORS["red"]),
-        (hy,  "HY OAS (%)",    COLORS["amber"]),
-    ], "VIX · HY 신용스프레드")
-    fig.add_hrect(y0=25, y1=100, fillcolor="rgba(239,68,68,0.04)", line_width=0)
-    st.plotly_chart(fig, use_container_width=True)
-
+    fig = lc([(ser(market,"VIX"),"VIX","#EF4444"),(ser(fred,"HY_OAS"),"HY OAS %","#F59E0B")],
+             "VIX · HY 신용스프레드")
+    fig.add_hrect(y0=25,y1=100,fillcolor="rgba(239,68,68,0.03)",line_width=0)
+    st.plotly_chart(fig,use_container_width=True)
 with c2:
-    fg = get_series(sentiment, "FEAR_GREED")
-    sp = get_series(fred,      "T10Y2Y_SPREAD")
+    fg_s = ser(sentiment,"FEAR_GREED"); sp_s = ser(fred,"T10Y2Y_SPREAD")
+    fig = make_subplots(specs=[[{"secondary_y":True}]])
+    AX = dict(showgrid=True,gridcolor=G,zeroline=False,showline=False,tickfont=dict(size=9))
+    if not fg_s.empty:
+        fig.add_trace(go.Scatter(x=fg_s["date"],y=fg_s["value"],name="공포탐욕",
+            line=dict(color="#3B82F6",width=1.8),
+            hovertemplate="<b>공포탐욕</b> %{y:.0f}<extra></extra>"),secondary_y=False)
+        fig.add_hrect(y0=0,y1=25,fillcolor="rgba(239,68,68,0.04)",line_width=0)
+        fig.add_hrect(y0=75,y1=100,fillcolor="rgba(34,197,94,0.04)",line_width=0)
+    if not sp_s.empty:
+        fig.add_trace(go.Scatter(x=sp_s["date"],y=sp_s["value"],name="2Y-10Y %",
+            line=dict(color="#F59E0B",width=1.5,dash="dot"),
+            hovertemplate="<b>스프레드</b> %{y:.2f}%<extra></extra>"),secondary_y=True)
+    fig.add_hline(y=0,line_dash="dot",line_color="#243550",line_width=1,secondary_y=True)
+    fig.update_layout(title=dict(text="공포탐욕지수 · 금리 스프레드",font=dict(size=11,color="#6B7280"),x=0),
+        height=262,paper_bgcolor=P,plot_bgcolor=B,
+        font=dict(family="JetBrains Mono",size=10,color="#4E5F74"),
+        margin=dict(l=6,r=6,t=30,b=6),
+        legend=dict(orientation="h",y=1.1,x=0,font=dict(size=9,color="#6B7280"),bgcolor="rgba(0,0,0,0)"),
+        hovermode="x unified",hoverlabel=dict(bgcolor="#111D2E",bordercolor="#243550",font=dict(family="JetBrains Mono",size=11)),
+        xaxis=AX)
+    fig.update_yaxes(showgrid=True,gridcolor=G,zeroline=False,showline=False,tickfont=dict(size=9),secondary_y=False)
+    fig.update_yaxes(showgrid=False,zeroline=False,showline=False,tickfont=dict(size=9,color="#F59E0B"),secondary_y=True)
+    st.plotly_chart(fig,use_container_width=True)
 
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
-    if not fg.empty:
-        fig.add_trace(go.Scatter(
-            x=fg["date"], y=fg["value"], name="공포탐욕지수",
-            line=dict(color=COLORS["blue"], width=2),
-            hovertemplate="<b>공포탐욕</b> %{y:.0f}<extra></extra>",
-        ), secondary_y=False)
-        fig.add_hrect(y0=0,  y1=25,  fillcolor="rgba(239,68,68,0.06)",  line_width=0)
-        fig.add_hrect(y0=75, y1=100, fillcolor="rgba(16,185,129,0.06)", line_width=0)
-    if not sp.empty:
-        fig.add_trace(go.Scatter(
-            x=sp["date"], y=sp["value"], name="2Y-10Y (%)",
-            line=dict(color=COLORS["amber"], width=1.5, dash="dot"),
-            hovertemplate="<b>스프레드</b> %{y:.2f}%<extra></extra>",
-        ), secondary_y=True)
-    fig.add_hline(y=0, line_dash="dot", line_color="#374151", line_width=1, secondary_y=True)
-    fig.update_layout(
-        title=dict(text="공포탐욕지수 · 금리 스프레드", font=dict(size=12, color="#9CA3AF"), x=0),
-        template="plotly_dark", paper_bgcolor=CHART_BG, plot_bgcolor=CHART_BG,
-        height=270, margin=dict(l=8, r=8, t=36, b=8),
-        legend=dict(orientation="h", y=1.08, x=0, font=dict(size=10),
-                    bgcolor="rgba(0,0,0,0)"),
-        xaxis=dict(showgrid=True, gridcolor=GRID),
-        hovermode="x unified",
-    )
-    fig.update_yaxes(showgrid=True, gridcolor=GRID, secondary_y=False)
-    fig.update_yaxes(showgrid=False, secondary_y=True)
-    st.plotly_chart(fig, use_container_width=True)
-
-# ── Section B: 금리·달러 ──────────────────────────────────────
-st.markdown('<div class="section-label">B · 미국 금리 & 달러</div>', unsafe_allow_html=True)
-c1, c2 = st.columns(2)
-
+# ── B
+sh("B","미국 금리 & 달러")
+c1,c2 = st.columns(2)
 with c1:
-    us10 = get_series(fred,   "US_10Y")
-    sp   = get_series(fred,   "T10Y2Y_SPREAD")
-    fig  = line_chart([
-        (us10, "미국 10Y 금리 (%)", COLORS["blue"]),
-        (sp,   "2Y-10Y 스프레드",  COLORS["amber"]),
-    ], "미국 금리", zero_line=True)
-    fig.add_hrect(y0=4.5, y1=10, fillcolor="rgba(245,158,11,0.04)", line_width=0)
-    st.plotly_chart(fig, use_container_width=True)
-
+    fig = lc([(ser(fred,"US_10Y"),"US 10Y %","#3B82F6"),(ser(fred,"T10Y2Y_SPREAD"),"2Y-10Y %","#F59E0B")],
+             "미국 국채금리",zero=True)
+    fig.add_hrect(y0=4.5,y1=10,fillcolor="rgba(245,158,11,0.03)",line_width=0)
+    st.plotly_chart(fig,use_container_width=True)
 with c2:
-    dxy = get_series(market, "DXY")
-    fig = line_chart([(dxy, "DXY 달러 인덱스", COLORS["purple"])], "DXY 달러 인덱스")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(lc([(ser(market,"DXY"),"DXY","#8B5CF6")],"DXY 달러 인덱스"),use_container_width=True)
 
-# ── Section C: 한국 시장 ──────────────────────────────────────
-st.markdown('<div class="section-label">C · 한국 시장</div>', unsafe_allow_html=True)
-c1, c2 = st.columns(2)
-
+# ── C
+sh("C","한국 시장")
+c1,c2 = st.columns(2)
 with c1:
-    krw = get_series(market, "USDKRW")
-    fig = line_chart([(krw, "USD/KRW", COLORS["orange"])], "원달러 환율")
-    fig.add_hrect(y0=1400, y1=2500, fillcolor="rgba(239,68,68,0.04)", line_width=0)
-    st.plotly_chart(fig, use_container_width=True)
-
+    fig = lc([(ser(market,"USDKRW"),"USD/KRW","#F97316")],"원달러 환율")
+    fig.add_hrect(y0=1400,y1=2500,fillcolor="rgba(239,68,68,0.03)",line_width=0)
+    st.plotly_chart(fig,use_container_width=True)
 with c2:
-    ksp = get_series(market, "KOSPI")
-    fig = line_chart([(ksp, "KOSPI", COLORS["teal"])], "KOSPI")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(lc([(ser(market,"KOSPI"),"KOSPI","#00E5CC")],"KOSPI"),use_container_width=True)
 
-# ── Section D: 글로벌 모멘텀 ─────────────────────────────────
-st.markdown('<div class="section-label">D · 글로벌 주식 모멘텀</div>', unsafe_allow_html=True)
-c1, c2 = st.columns(2)
-
+# ── D
+sh("D","글로벌 주식 모멘텀")
+c1,c2 = st.columns(2)
 with c1:
-    sox = get_series(market, "SOX")
-    fig = line_chart([(sox, "SOX 반도체지수", COLORS["blue"])], "필라델피아 반도체 (SOX)")
-    st.plotly_chart(fig, use_container_width=True)
-
+    st.plotly_chart(lc([(ser(market,"SOX"),"SOX 반도체","#3B82F6")],"필라델피아 반도체 (SOX)"),use_container_width=True)
 with c2:
-    spx = get_series(market, "SPX")
-    fig = line_chart([(spx, "S&P 500", COLORS["purple"])], "S&P 500")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(lc([(ser(market,"SPX"),"S&P 500","#8B5CF6")],"S&P 500"),use_container_width=True)
 
-# ── Section E: 미국 월간 매크로 ──────────────────────────────
-st.markdown('<div class="section-label">E · 미국 월간 매크로</div>', unsafe_allow_html=True)
-c1, c2 = st.columns(2)
-
+# ── E
+sh("E","미국 월간 매크로")
+c1,c2 = st.columns(2)
 with c1:
-    cpi = get_series(fred, "US_CORE_CPI", days=365 * 6)
+    cpi = ser(fred,"US_CORE_CPI",days=365*6)
     if not cpi.empty:
         cpi = cpi.copy()
-        cpi["yoy"] = cpi["value"].pct_change(12) * 100
-        cpi_yoy = cpi.dropna(subset=["yoy"])[["date", "yoy"]].rename(columns={"yoy": "value"})
-        fig = line_chart([(cpi_yoy, "Core CPI YoY (%)", COLORS["orange"])], "미국 Core CPI YoY")
-        fig.add_hline(y=2.0, line_dash="dot", line_color="#374151", line_width=1.5,
-                      annotation_text="목표 2%", annotation_font_color="#6B7280",
-                      annotation_position="bottom right")
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Core CPI 데이터 로딩 중")
-
+        cpi["yoy"] = cpi["value"].pct_change(12)*100
+        cy = cpi.dropna(subset=["yoy"])[["date","yoy"]].rename(columns={"yoy":"value"})
+        fig = lc([(cy,"Core CPI YoY %","#F97316")],"미국 Core CPI YoY")
+        fig.add_hline(y=2.0,line_dash="dot",line_color="#243550",line_width=1.5,
+                      annotation_text="2% 목표",annotation_font_color="#4E5F74",annotation_position="bottom right")
+        st.plotly_chart(fig,use_container_width=True)
 with c2:
-    nfp = get_series(fred, "US_NFP", days=365 * 5)
+    nfp = ser(fred,"US_NFP",days=365*5)
     if not nfp.empty:
-        nfp = nfp.copy()
-        nfp["mom"] = nfp["value"].diff()
-        nfp_mom = nfp.dropna(subset=["mom"])
-        bar_colors = [COLORS["green"] if v >= 0 else COLORS["red"] for v in nfp_mom["mom"]]
-        fig = go.Figure(go.Bar(
-            x=nfp_mom["date"], y=nfp_mom["mom"],
-            marker_color=bar_colors,
-            hovertemplate="<b>NFP MoM</b><br>%{x|%Y-%m}<br>%{y:,.0f}천명<extra></extra>",
-        ))
-        fig.update_layout(
-            title=dict(text="비농업 고용 월간 변화 (천명)", font=dict(size=12, color="#9CA3AF"), x=0),
-            template="plotly_dark", paper_bgcolor=CHART_BG, plot_bgcolor=CHART_BG,
-            height=270, margin=dict(l=8, r=8, t=36, b=8),
-            xaxis=dict(showgrid=True, gridcolor=GRID),
-            yaxis=dict(showgrid=True, gridcolor=GRID),
-            showlegend=False,
-        )
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("NFP 데이터 로딩 중")
+        nfp = nfp.copy(); nfp["mom"] = nfp["value"].diff()
+        nm = nfp.dropna(subset=["mom"])
+        fig = go.Figure(go.Bar(x=nm["date"],y=nm["mom"],
+            marker_color=["#22C55E" if v>=0 else "#EF4444" for v in nm["mom"]],
+            hovertemplate="<b>NFP MoM</b> %{y:,.0f}천명<extra></extra>"))
+        nl = {k:v for k,v in BASE.items() if k!="legend"}
+        fig.update_layout(title=dict(text="비농업 고용 MoM (천명)",font=dict(size=11,color="#6B7280"),x=0),
+                          height=262,showlegend=False,**nl)
+        st.plotly_chart(fig,use_container_width=True)
 
-# ── Section F: 한국 매크로 (ECOS) ────────────────────────────
-st.markdown('<div class="section-label">F · 한국 매크로 (한국은행 ECOS)</div>', unsafe_allow_html=True)
-
+# ── F
+sh("F","한국 매크로 · ECOS")
 if ecos.empty:
     st.info("ECOS 데이터 없음")
 else:
-    preview = [c for c in ["CLASS_NAME", "KEYSTAT_NAME", "DATA_VALUE", "UNIT_NAME", "CYCLE"]
-               if c in ecos.columns]
-    if preview:
-        disp = ecos[preview].copy()
-        disp.columns = ["분류", "지표명", "현재값", "단위", "주기"][:len(preview)]
-        st.dataframe(disp, use_container_width=True, height=380, hide_index=True)
+    cols = [c for c in ["CLASS_NAME","KEYSTAT_NAME","DATA_VALUE","UNIT_NAME","CYCLE"] if c in ecos.columns]
+    if cols:
+        rows = ""
+        for _,r in ecos[cols].iterrows():
+            rows += (f'<tr><td class="ec">{r.get("CLASS_NAME","")}</td>'
+                     f'<td>{r.get("KEYSTAT_NAME","")}</td>'
+                     f'<td class="ev">{r.get("DATA_VALUE","")}</td>'
+                     f'<td class="eu">{r.get("UNIT_NAME","")}</td>'
+                     f'<td class="ec" style="text-align:right">{r.get("CYCLE","")}</td></tr>')
+        st.markdown(f"""
+<div class="ew"><table class="et">
+  <thead><tr>
+    <th style="width:18%">분류</th><th style="width:42%">지표명</th>
+    <th style="width:15%;text-align:right">현재값</th>
+    <th style="width:12%;text-align:right">단위</th>
+    <th style="width:8%;text-align:right">주기</th>
+  </tr></thead>
+  <tbody>{rows}</tbody>
+</table></div>""", unsafe_allow_html=True)
 
-# ── 푸터 ─────────────────────────────────────────────────────
-st.markdown("---")
-st.markdown(
-    '<p style="text-align:center;color:#374151;font-size:0.72rem;">'
-    'FRED · yfinance · CNN Fear & Greed · ECOS · 매일 KST 07:00 자동 수집</p>',
-    unsafe_allow_html=True,
-)
+st.markdown("""
+<div class="db-ft">FRED &nbsp;·&nbsp; yfinance &nbsp;·&nbsp; CNN Fear & Greed &nbsp;·&nbsp; 한국은행 ECOS &nbsp;·&nbsp; 매일 KST 07:00 자동 수집</div>
+""", unsafe_allow_html=True)
