@@ -133,7 +133,7 @@ def sh(id_, name):
 
 def regime():
     v = lat(market,"VIX"); h = lat(fred,"HY_OAS")
-    if not v or not h: return "neu","LOADING","데이터 수집 중"
+    if v is None or h is None: return "neu","LOADING","데이터 수집 중"
     vv,hv = v["value"],h["value"]
     if vv>28 or hv>5.5:   return "risk","RISK-OFF",f"VIX {vv:.1f} · HY {hv:.2f}% — 위험 회피 국면"
     elif vv<16 and hv<3.5: return "on","RISK-ON", f"VIX {vv:.1f} · HY {hv:.2f}% — 위험 선호 국면"
