@@ -53,6 +53,15 @@ section[data-testid="stSidebar"]{{display:none}}
 #MainMenu,footer,header{{visibility:hidden}}
 p,span,div,label,th,td{{color:{TXT}!important;letter-spacing:.015em!important;line-height:1.3!important}}
 .kpi-grid{{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;flex:1}}
+/* sticky KPI 활성화 */
+section[data-testid="stMain"]{{overflow:auto!important}}
+[data-testid="stMainBlockContainer"]{{overflow:visible!important}}
+/* 버튼 스타일 */
+.stButton>button{{
+  background-color:{CARD}!important;color:{TXT}!important;
+  border:1px solid {BORD}!important;border-radius:8px!important;
+  font-family:'MaruBuri',serif!important;padding:6px 16px!important}}
+.stButton>button:hover{{border-color:{B5}!important;color:{B5}!important}}
 </style>
 """, unsafe_allow_html=True)
 
