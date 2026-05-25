@@ -18,7 +18,7 @@ st.set_page_config(page_title="Deokyoon's Monitoring",
 BG    = "#F5F0E5"; CARD  = "#FFFFFF"; C2 = "#FAF6EC"
 BORD  = "#E5DDD0"; G    = "#EFE8D6"
 TXT   = "#2A2620"; SUB  = "#5A5246"; MUT = "#8C7F6E"
-PUR_HI = "#E0CCF5"; PUR_DK = "#7E22CE"
+PUR_HI = "#BAE6FD"; PUR_DK = "#0369A1"
 B1 = "#DBEAFE"; B3 = "#60A5FA"; B4 = "#3B82F6"
 B5 = "#2563EB"; B6 = "#1D4ED8"; B7 = "#1E40AF"; B8 = "#1E3A8A"
 UP = B5; DN = B8; AC = B6
@@ -35,11 +35,24 @@ st.markdown(f"""
 @font-face{{font-family:'MaruBuri';
   src:url('https://cdn.jsdelivr.net/gh/wkdtjsgur100/maruburifonts@1.0/static/MaruBuri/MaruBuri-Bold.woff2') format('woff2');
   font-weight:700}}
-html,body,[class*="css"]{{background:{BG}!important;color:{TXT}!important;
+html,body,[class*="css"]{{background-color:{BG}!important;
+  background-image:
+    radial-gradient(rgba(139,119,98,0.045) 1px, transparent 1px),
+    radial-gradient(rgba(139,119,98,0.025) 1px, transparent 1px)!important;
+  background-size: 32px 32px, 16px 16px!important;
+  background-position: 0 0, 8px 8px!important;
+  color:{TXT}!important;
   font-family:'MaruBuri','Gowun Batang',serif!important;
   letter-spacing:.015em!important;line-height:1.3!important}}
 .block-container{{padding:0 2rem 3rem!important;max-width:100%!important;background:{BG}!important}}
-[data-testid="stAppViewContainer"]{{background:{BG}!important}}
+[data-testid="stAppViewContainer"]{{
+  background-color:{BG}!important;
+  background-image:
+    radial-gradient(rgba(139,119,98,0.045) 1px, transparent 1px),
+    radial-gradient(rgba(139,119,98,0.025) 1px, transparent 1px)!important;
+  background-size: 32px 32px, 16px 16px!important;
+  background-position: 0 0, 8px 8px!important;
+}}
 [data-testid="stHeader"]{{background:{BG}!important;border-bottom:1px solid {BORD}!important;height:0}}
 section[data-testid="stSidebar"]{{display:none}}
 #MainMenu,footer,header{{visibility:hidden}}
@@ -399,8 +412,8 @@ with c2:
             mode="gauge+number", value=fv,
             domain={"x":[0,1],"y":[0,1]},
             number={"font":{"size":42,"family":"MaruBuri","color":TXT}},
-            title={"text":f'{fl} · CNN Fear & Greed Index',
-                   "font":{"size":13,"color":fc}},
+            title={"text":f'CNN F&G  ·  {fl}',
+                   "font":{"size":12,"color":fc}},
             gauge={
                 "axis":{
                     "range":[0,100], "tickwidth":0,
@@ -418,7 +431,7 @@ with c2:
                     {"range":[75,100],"color":"rgba(96,165,250,0.12)"}],
                 "threshold":{"line":{"color":TXT,"width":2},"thickness":0.7,"value":fv},
             }))
-        fig.update_layout(paper_bgcolor=CARD,height=270,margin=dict(l=20,r=20,t=30,b=10))
+        fig.update_layout(paper_bgcolor=CARD,height=270,margin=dict(l=20,r=20,t=48,b=15))
         st.plotly_chart(fig, use_container_width=True)
     else: no_data("F&G 수집 중")
 
@@ -436,10 +449,20 @@ with c1:
                 line=dict(color=clr,width=2),hovertemplate=f"<b>{nm}</b> %{{y:.2f}}%<extra></extra>"))
             rate_s.append(s)
     kor_base=get_ecos_val("한국은행 기준금리"); kor_3y=get_ecos_val("국고채수익률(3년)")
-    if kor_base: fig.add_hline(y=kor_base,line_dash="dot",line_color=PUR_DK,line_width=1.5,
-                     annotation_text=f"한국 기준금리 {kor_base:.2f}%",annotation_font_color=PUR_DK,annotation_position="right")
-    if kor_3y:   fig.add_hline(y=kor_3y,line_dash="dash",line_color=MUT,line_width=1.2,
-                     annotation_text=f"한국 국고채3Y {kor_3y:.2f}%",annotation_font_color=MUT,annotation_position="right")
+    if kor_base:
+        fig.add_hline(y=kor_base, line_dash="dot", line_color=PUR_DK, line_width=1.5)
+        fig.add_annotation(x=0.01, xref="paper", y=kor_base, yref="y",
+            text=f"한국 기준금리 {kor_base:.2f}%",
+            showarrow=False, xanchor="left", yanchor="bottom",
+            font=dict(color=PUR_DK, size=9, family="JetBrains Mono"),
+            bgcolor=CARD, borderpad=2, opacity=0.92)
+    if kor_3y:
+        fig.add_hline(y=kor_3y, line_dash="dash", line_color=MUT, line_width=1.2)
+        fig.add_annotation(x=0.01, xref="paper", y=kor_3y, yref="y",
+            text=f"한국 국고채3Y {kor_3y:.2f}%",
+            showarrow=False, xanchor="left", yanchor="top",
+            font=dict(color=MUT, size=9, family="JetBrains Mono"),
+            bgcolor=CARD, borderpad=2, opacity=0.92)
     if fig.data:
         lay=BL("美 3Y / 10Y / 30Y + 한국 기준금리 · 국고채",270)
         yr=yrange(*rate_s)
