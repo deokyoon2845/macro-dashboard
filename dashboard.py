@@ -1,6 +1,11 @@
 """
-Deokyoon's Monitoring — v10
-섹션 재편 + 달력 위젯 + 히트맵 중립색 수정
+Deokyoon's Monitoring — v11
+변경사항:
+1. CSS: sticky 활성화 + 버튼 스타일
+2. get_ecos_val: 키워드 매칭 강화 (한국 국고채)
+3. 섹션 1: F&G ↔ 2Y-10Y 순서 교체
+4. 섹션 4 미국증시: 400일 데이터
+5. 히트맵 보합 색상: #D8D0C8 (더 연한 회색)
 """
 import streamlit as st
 import pandas as pd
@@ -18,14 +23,14 @@ st.set_page_config(page_title="Deokyoon's Monitoring",
 BG="#F5F0E5"; CARD="#FFFFFF"; C2="#FAF6EC"
 BORD="#E5DDD0"; G="#EFE8D6"
 TXT="#2A2620"; SUB="#5A5246"; MUT="#8C7F6E"
-PUR_HI="#BAE6FD"; PUR_DK="#0369A1"   # 하늘색 하이라이트
+PUR_HI="#BAE6FD"; PUR_DK="#0369A1"
 B1="#DBEAFE"; B3="#60A5FA"; B4="#3B82F6"
 B5="#2563EB"; B6="#1D4ED8"; B7="#1E40AF"; B8="#1E3A8A"
 UP=B5; DN=B8
 
 def up_dn(d): return UP if (d or 0)>=0 else DN
 
-# ── CSS (종이 질감 배경) ──────────────────────────────────────
+# ── CSS (종이 질감 배경 + sticky 활성화 + 버튼 스타일) ──────
 st.markdown(f"""
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -56,12 +61,19 @@ p,span,div,label,th,td{{color:{TXT}!important;letter-spacing:.015em!important;li
 /* sticky KPI 활성화 */
 section[data-testid="stMain"]{{overflow:auto!important}}
 [data-testid="stMainBlockContainer"]{{overflow:visible!important}}
-/* 버튼 스타일 */
+/* 버튼 스타일 (이전달/다음달 버튼 색상 수정) */
 .stButton>button{{
   background-color:{CARD}!important;color:{TXT}!important;
   border:1px solid {BORD}!important;border-radius:8px!important;
-  font-family:'MaruBuri',serif!important;padding:6px 16px!important}}
-.stButton>button:hover{{border-color:{B5}!important;color:{B5}!important}}
+  font-family:'MaruBuri',serif!important;padding:6px 16px!important;
+  font-size:13px!important;font-weight:500!important;
+  box-shadow:none!important}}
+.stButton>button:hover{{
+  border-color:{B5}!important;color:{B5}!important;
+  background-color:{CARD}!important}}
+.stButton>button:active,.stButton>button:focus{{
+  background-color:{CARD}!important;color:{B5}!important;
+  border-color:{B5}!important;box-shadow:none!important}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -107,10 +119,16 @@ def pct_chg_1d(ind):
     except: return 0.0
 
 def get_ecos_val(keyword):
+    """ECOS 100대 통계에서 값 조회. 정확 매칭 실패 시 괄호 앞 부분 매칭 시도."""
     if ecos.empty or "KEYSTAT_NAME" not in ecos.columns: return None
-    r=ecos[ecos["KEYSTAT_NAME"].str.contains(keyword,na=False)]
+    r = ecos[ecos["KEYSTAT_NAME"].str.contains(keyword, na=False, regex=False)]
+    if r.empty and "(" in keyword:
+        base = keyword.split("(")[0]
+        r = ecos[ecos["KEYSTAT_NAME"].str.contains(base, na=False, regex=False)]
     if r.empty: return None
-    try: return float(str(r.iloc[0]["DATA_VALUE"]).replace(",",""))
+    try:
+        raw = str(r.iloc[0]["DATA_VALUE"]).replace(",","").replace("%","").strip()
+        return float(raw)
     except: return None
 
 def yrange(*args,pad_pct=0.08):
@@ -207,7 +225,7 @@ def lc(traces,title="",h=270,zero=False):
     fig.update_layout(**lay)
     return fig
 
-# ── 히트맵 ───────────────────────────────────────────────────
+# ── 히트맵 (보합 색상 #D8D0C8 — 더 연한 회색) ───────────────
 def make_treemap(stocks,title="",h=580):
     labels,parents,values,colors,cdata=[],[],[],[],[]
     for ind,(name,mcap) in stocks.items():
@@ -221,8 +239,7 @@ def make_treemap(stocks,title="",h=580):
         tiling=dict(packing="squarify",squarifyratio=1),
         marker=dict(
             colors=colors,
-            # 중립(0%) = 따뜻한 회갈색으로 → 배경과 구분
-            colorscale=[[0.0,B8],[0.35,B6],[0.47,"#B0A49A"],[0.53,"#B0A49A"],[0.65,B4],[1.0,B1]],
+            colorscale=[[0.0,B8],[0.35,B6],[0.47,"#D8D0C8"],[0.53,"#D8D0C8"],[0.65,B4],[1.0,B1]],
             cmid=0,cmin=-5,cmax=5,showscale=True,
             colorbar=dict(thickness=10,len=0.4,ticksuffix="%",
                 tickfont=dict(size=9,color=MUT),
@@ -294,25 +311,6 @@ def fg_color_val(v):
     elif v<75: return B4,"탐욕"
     else:      return B3,"극도탐욕"
 
-def fgcard_html():
-    r=lat(sentiment,"FEAR_GREED")
-    CS=(f"background:{CARD};border:1px solid {BORD};border-radius:8px;"
-        f"padding:8px 9px;font-family:'MaruBuri',serif;"
-        f"display:flex;justify-content:space-between;gap:6px;align-items:stretch")
-    if r is None:
-        return f'<div style="{CS};border-left:3px solid {MUT}"><div style="flex:1"><div style="font-size:9px;color:{MUT}">F&G</div><div style="font-size:15px;font-weight:700">—</div></div></div>'
-    v=r["value"]; fc,ft=fg_color_val(v)
-    badge=(f'<span style="background:{fc}25;color:{fc};border:1px solid {fc}40;'
-           f'padding:1px 5px;border-radius:6px;font-size:8px;font-weight:600">{ft}</span>')
-    spk=spark(sentiment,"FEAR_GREED",color=fc,w=62,h=24)
-    spkd=f'<div style="flex:0 0 auto;align-self:center;opacity:.65">{spk}</div>' if spk else ""
-    return (f'<div style="{CS};border-left:3px solid {fc}">'
-            f'<div style="flex:1;min-width:0">'
-            f'<div style="font-size:9px;color:{MUT};text-transform:uppercase;letter-spacing:.05em">F&G</div>'
-            f'<div style="font-size:8px;color:{MUT};line-height:1.2;margin:1px 0 3px">0 극공포 · 50 중립 · 100 극탐욕</div>'
-            f'<div style="font-size:15px;font-weight:700;color:{TXT};line-height:1.1;margin-bottom:1px">{v:.0f}</div>'
-            f'{badge}</div>{spkd}</div>')
-
 # ── 섹션 헤더 ─────────────────────────────────────────────────
 def sh(num,name_ko,name_en=""):
     en=f'<span style="font-size:11px;color:{MUT};margin-left:10px;font-family:sans-serif">{name_en}</span>' if name_en else ""
@@ -333,8 +331,7 @@ def no_data(label=""):
         unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
-# 상단 고정 헤더
-# KPI 순서: S&P500, NASDAQ, KOSPI, KOSDAQ, VIX, USD/KRW, US 10Y
+# 상단 고정 헤더 (sticky)
 # ══════════════════════════════════════════════════════════════
 KPI_SPECS=[
     ("S&P500",  "SPX",    market,",.0f",False),
@@ -380,7 +377,7 @@ st.markdown(f"""
 """,unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
-# 1. 시장 심리 (VIX+HY OAS | F&G | 2Y-10Y 스프레드)
+# 1. 시장 심리 (VIX+HY OAS | 2Y-10Y 스프레드 | F&G)
 # ══════════════════════════════════════════════════════════════
 sh("1","시장 심리","Market Sentiment")
 c1,c2,c3=st.columns([1.1,0.9,0.9])
@@ -401,6 +398,22 @@ with c1:
     st.plotly_chart(fig,use_container_width=True)
 
 with c2:
+    sp_s=ser(fred,"T10Y2Y_SPREAD")
+    if not sp_s.empty:
+        fig=go.Figure()
+        fig.add_trace(go.Scatter(x=sp_s["date"],y=sp_s["value"],name="2Y-10Y 스프레드",
+            line=dict(color=B5,width=2),hovertemplate="<b>스프레드</b> %{y:.2f}%<extra></extra>"))
+        fig.add_hline(y=0,line_dash="dot",line_color=MUT,line_width=1.5,
+                      annotation_text="장단기 역전 기준",annotation_font_color=MUT,
+                      annotation_position="bottom right")
+        lay=BL("2Y-10Y 스프레드 — 음수=경기침체 신호",270)
+        yr=yrange(sp_s)
+        if yr: lay["yaxis"]["range"]=yr
+        fig.update_layout(**lay)
+        st.plotly_chart(fig,use_container_width=True)
+    else: no_data("T10Y2Y_SPREAD")
+
+with c3:
     fg_row=lat(sentiment,"FEAR_GREED")
     if fg_row is not None:
         fv=fg_row["value"]; fc,fl=fg_color_val(fv)
@@ -426,24 +439,6 @@ with c2:
         st.plotly_chart(fig,use_container_width=True)
     else: no_data("F&G 수집 중")
 
-with c3:
-    # 2Y-10Y 스프레드 (시장심리와 관련)
-    sp_s=ser(fred,"T10Y2Y_SPREAD")
-    if not sp_s.empty:
-        fig=go.Figure()
-        fig.add_trace(go.Scatter(x=sp_s["date"],y=sp_s["value"],name="2Y-10Y 스프레드",
-            line=dict(color=B5,width=2),hovertemplate="<b>스프레드</b> %{y:.2f}%<extra></extra>"))
-        # 색상으로 음수/양수 구분
-        fig.add_hline(y=0,line_dash="dot",line_color=MUT,line_width=1.5,
-                      annotation_text="장단기 역전 기준",annotation_font_color=MUT,
-                      annotation_position="bottom right")
-        lay=BL("2Y-10Y 스프레드 — 음수=경기침체 신호",270)
-        yr=yrange(sp_s)
-        if yr: lay["yaxis"]["range"]=yr
-        fig.update_layout(**lay)
-        st.plotly_chart(fig,use_container_width=True)
-    else: no_data("T10Y2Y_SPREAD")
-
 # ══════════════════════════════════════════════════════════════
 # 2. 금리 & 통화정책
 # ══════════════════════════════════════════════════════════════
@@ -451,7 +446,6 @@ sh("2","금리 & 통화정책","Rates & Monetary Policy")
 c1,c2=st.columns(2)
 
 with c1:
-    # 정책금리 비교: 미국 FFR vs 한국 기준금리
     ffr_s=ser(fred,"FFR_UPPER")
     kor_base=get_ecos_val("한국은행 기준금리")
     fig=go.Figure()
@@ -481,7 +475,6 @@ with c1:
     else: no_data("FFR 데이터")
 
 with c2:
-    # 시장금리 비교: 미국 국고채 vs 한국 국고채
     fig=go.Figure(); rate_s=[]
     for ind,nm,clr in [("US_3Y","美3년",B3),("US_10Y","美10년",B5),("US_30Y","美30년",B7)]:
         s=ser(fred,ind)
@@ -489,10 +482,14 @@ with c2:
             fig.add_trace(go.Scatter(x=s["date"],y=s["value"],name=nm,
                 line=dict(color=clr,width=2),hovertemplate=f"<b>{nm}</b> %{{y:.2f}}%<extra></extra>"))
             rate_s.append(s)
-    kor_3y=get_ecos_val("국고채수익률(3년)"); kor_5y=get_ecos_val("국고채수익률(5년)")
+    # 한국 국고채 — 여러 키워드 시도
+    kor_3y = (get_ecos_val("국고채수익률(3년)") or get_ecos_val("국고채(3년)") 
+              or get_ecos_val("국고채 3년"))
+    kor_5y = (get_ecos_val("국고채수익률(5년)") or get_ecos_val("국고채(5년)") 
+              or get_ecos_val("국고채 5년"))
     for val,lbl,offset in [(kor_3y,"한국 국고채3Y",0.08),(kor_5y,"한국 국고채5Y",-0.08)]:
         if val:
-            fig.add_hline(y=val,line_dash="dot",line_color=PUR_DK,line_width=1.5)
+            fig.add_hline(y=val,line_dash="dot",line_color=PUR_DK,line_width=1.8)
             fig.add_annotation(x=0.02,xref="paper",y=val,yref="y",
                 text=f"{lbl} {val:.2f}%",showarrow=False,
                 xanchor="left",yanchor="bottom" if offset>0 else "top",
@@ -535,11 +532,11 @@ if fig.data:
 else: no_data("환율 데이터")
 
 # ══════════════════════════════════════════════════════════════
-# 4. 미국 증시 (SOX 차트 제거)
+# 4. 미국 증시 (400일 데이터로 May 2025 표시 보장)
 # ══════════════════════════════════════════════════════════════
 sh("4","미국 증시","US Market")
-spx=ser(market,"SPX"); nas=ser(market,"NASDAQ")
-spx_ma50=ma(market,"SPX",50); spx_ma200=ma(market,"SPX",200)
+spx=ser(market,"SPX",days=400); nas=ser(market,"NASDAQ",days=400)
+spx_ma50=ma(market,"SPX",50,days=400); spx_ma200=ma(market,"SPX",200,days=400)
 fig=make_subplots(specs=[[{"secondary_y":True}]])
 AX=dict(showgrid=True,gridcolor=G,zeroline=False,showline=False,tickfont=dict(size=9,color=MUT))
 if not spx.empty:
@@ -607,8 +604,8 @@ st.plotly_chart(make_treemap(US_STOCKS,"미국 시총 TOP 100 히트맵",h=600),
 sh("5","한국 증시","Korean Market")
 c1,c2=st.columns(2)
 with c1:
-    ksp=ser(market,"KOSPI"); ksq=ser(market,"KOSDAQ")
-    ksp_ma50=ma(market,"KOSPI",50); ksp_ma200=ma(market,"KOSPI",200)
+    ksp=ser(market,"KOSPI",days=400); ksq=ser(market,"KOSDAQ",days=400)
+    ksp_ma50=ma(market,"KOSPI",50,days=400); ksp_ma200=ma(market,"KOSPI",200,days=400)
     fig=make_subplots(specs=[[{"secondary_y":True}]])
     if not ksp.empty:
         fig.add_trace(go.Scatter(x=ksp["date"],y=ksp["value"],name="KOSPI (좌)",
@@ -739,7 +736,7 @@ with c3:
     else: no_data("BTC·ETH")
 
 # ══════════════════════════════════════════════════════════════
-# 8. 유동성 (미국 매크로 바로 위)
+# 8. 유동성
 # ══════════════════════════════════════════════════════════════
 sh("8","유동성","Liquidity")
 c1,c2=st.columns(2)
@@ -753,7 +750,7 @@ with c2:
     else: no_data("美 M2")
 
 # ══════════════════════════════════════════════════════════════
-# 9. 미국 매크로 (NFP+Claims 통합, 소매판매 제거)
+# 9. 미국 매크로
 # ══════════════════════════════════════════════════════════════
 sh("9","미국 매크로","US Macro")
 c1,c2=st.columns(2)
@@ -779,7 +776,6 @@ with c1:
     else: no_data("CPI·PCE")
 
 with c2:
-    # NFP MoM (막대) + Initial Jobless Claims (선, 보조축) 통합
     nfp=ser(fred,"US_NFP",days=365*4); ic=ser(fred,"US_INIT_CLAIMS",days=365*4)
     if not nfp.empty:
         nfp=nfp.copy(); nfp["mom"]=nfp["value"].diff(); nm_=nfp.dropna(subset=["mom"])
@@ -814,7 +810,6 @@ st.markdown(f"""
 
 col_ecos, col_cal = st.columns([1, 1.5])
 
-# ── 왼쪽: 한국 매크로 ECOS ──────────────────────────────────
 with col_ecos:
     st.markdown(f'<div style="font-size:14px;font-weight:600;color:{SUB};margin-bottom:8px;font-family:\'MaruBuri\',serif">한국 매크로 · ECOS TOP 10</div>',unsafe_allow_html=True)
     ECOS_TOP=["한국은행 기준금리","국고채수익률","원/달러","KOSPI","수출","경상수지","M2","소비자물가","실업률","GDP"]
@@ -859,11 +854,9 @@ with col_ecos:
   </tr></thead><tbody>{rows}</tbody>
 </table></div>""",unsafe_allow_html=True)
 
-# ── 오른쪽: 경제 캘린더 ──────────────────────────────────────
 with col_cal:
     st.markdown(f'<div style="font-size:14px;font-weight:600;color:{SUB};margin-bottom:4px;font-family:\'MaruBuri\',serif">경제 캘린더</div>',unsafe_allow_html=True)
 
-    # 이전/다음 달 버튼
     nav1, nav2, nav3 = st.columns([1,3,1])
     with nav1:
         if st.button("◀ 이전달",key="cal_prev"):
@@ -881,7 +874,6 @@ with col_cal:
             else: st.session_state.cal_month+=1
             st.rerun()
 
-    # 이벤트 데이터
     CAL_EVENTS={
         date(2026,5,29):[("bok","한국 금통위")],
         date(2026,6,5): [("econ","美 NFP (5월)")],
@@ -926,7 +918,6 @@ with col_cal:
         weeks=cal_lib.monthcalendar(year,month)
         today=date.today()
 
-        # 요일 헤더
         day_hd=""
         for dn,dn_color in [("월",TXT),("화",TXT),("수",TXT),("목",TXT),("금",TXT),("토","#1D4ED8"),("일","#DC2626")]:
             day_hd+=f'<div style="text-align:center;font-size:10px;font-weight:600;color:{dn_color};padding:5px 0">{dn}</div>'
@@ -964,7 +955,6 @@ with col_cal:
                             f'<div style="font-size:12px;font-weight:{"700" if is_today else "400"};color:{day_c}">{day}</div>'
                             f'{ev_html}</div>')
 
-        # 범례
         legend=""
         for lbl,ev_type in [("FOMC","fomc"),("금통위","bok"),("경제지표","econ"),("실적","earn")]:
             ec,eb=TC[ev_type]
