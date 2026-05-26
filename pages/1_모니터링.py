@@ -566,7 +566,7 @@ with c1:
     lay=BL("S&P500 + MA50/MA200",270)
     yr=yrange(spx);
     if yr: lay["yaxis"]["range"]=yr
-    fig.update_layout(**lay,xaxis=AX); st.plotly_chart(fig,use_container_width=True)
+    fig.update_layout(**lay); st.plotly_chart(fig,use_container_width=True)
 
 with c2:
     nas=ser(market,"NASDAQ",days=400); nas50=ma(market,"NASDAQ",50,days=400); nas200=ma(market,"NASDAQ",200,days=400)
@@ -584,7 +584,7 @@ with c2:
     lay=BL("NASDAQ + MA50/MA200",270)
     yr=yrange(nas)
     if yr: lay["yaxis"]["range"]=yr
-    fig.update_layout(**lay,xaxis=AX); st.plotly_chart(fig,use_container_width=True)
+    fig.update_layout(**lay); st.plotly_chart(fig,use_container_width=True)
 
 US_STOCKS={
     "AAPL":("Apple",3100),"MSFT":("Microsoft",2900),"NVDA":("NVIDIA",2800),
@@ -643,7 +643,7 @@ with c1:
     lay=BL("KOSPI + MA50/MA200",270)
     yr=yrange(ksp)
     if yr: lay["yaxis"]["range"]=yr
-    fig.update_layout(**lay,xaxis=AX); st.plotly_chart(fig,use_container_width=True)
+    fig.update_layout(**lay); st.plotly_chart(fig,use_container_width=True)
 
 with c2:
     ksq=ser(market,"KOSDAQ",days=400); ksq50=ma(market,"KOSDAQ",50,days=400); ksq200=ma(market,"KOSDAQ",200,days=400)
@@ -659,7 +659,7 @@ with c2:
     lay=BL("KOSDAQ + MA50/MA200",270)
     yr=yrange(ksq)
     if yr: lay["yaxis"]["range"]=yr
-    fig.update_layout(**lay,xaxis=AX); st.plotly_chart(fig,use_container_width=True)
+    fig.update_layout(**lay); st.plotly_chart(fig,use_container_width=True)
 
 KR_STOCKS={
     "KR_SAMSUNG":("삼성전자",270),"KR_SKHYNIX":("SK하이닉스",130),
