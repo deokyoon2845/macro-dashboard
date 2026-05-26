@@ -100,7 +100,8 @@ def ser(df,ind,days=365):
     return s.sort_values("date")
 
 def dlt(df,ind):
-    s=ser(df,ind,15).sort_values("date")
+    s=ser(df,ind,15)          # ser() 내부에서 이미 date 정렬됨
+    if s.empty: return None   # 빈 경우 None 반환
     return (s.iloc[-1]["value"]-s.iloc[-2]["value"]) if len(s)>=2 else None
 
 def pct_chg_1d(ind):
