@@ -1,8 +1,10 @@
-pandas
+pandas>=2.0.0
 requests
 pyarrow
-yfinance
+yfinance>=0.2.30
 pykrx
 fear-and-greed
-streamlit
-plotly
+streamlit>=1.36.0
+plotly>=5.15.0
+pytrends
+openpyxl
