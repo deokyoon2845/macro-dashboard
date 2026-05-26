@@ -1,69 +1,46 @@
 """
-Deokyoon's Monitoring — v12  다크모드
+Deokyoon's Monitoring — v12 최적화
 """
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from pathlib import Path
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 import base64, calendar as cal_lib
 
 st.set_page_config(page_title="DY Monitoring",
                    page_icon="◈", layout="wide",
                    initial_sidebar_state="collapsed")
 
-# ── 다크 팔레트 ──────────────────────────────────────────────
-BG    = "#0D1117"
-CARD  = "#161B22"
-C2    = "#1C2128"
-BORD  = "#30363D"
-G     = "#21262D"
-TXT   = "#E6EDF3"
-SUB   = "#8D96A0"
-MUT   = "#6E7681"
-PUR_HI = "#1F6FEB"
-PUR_DK = "#58A6FF"
-B1    = "#CAE8FF"
-B3    = "#79C0FF"
-B4    = "#58A6FF"
-B5    = "#388BFD"
-B6    = "#2F81F7"
-B7    = "#1F6FEB"
-B8    = "#1158C7"
-UP    = "#3FB950"   # 상승 초록
-DN    = "#F85149"   # 하락 빨강
+# ── 팔레트 ──────────────────────────────────────────────────
+BG="#0D1117"; CARD="#161B22"; C2="#1C2128"; BORD="#30363D"; G="#21262D"
+TXT="#E6EDF3"; SUB="#8D96A0"; MUT="#6E7681"
+PUR_HI="#1F6FEB"; PUR_DK="#58A6FF"
+B1="#CAE8FF"; B3="#79C0FF"; B4="#58A6FF"; B5="#388BFD"; B6="#2F81F7"; B7="#1F6FEB"; B8="#1158C7"
+UP="#3FB950"; DN="#F85149"
 
-def up_dn(d): return UP if (d or 0) >= 0 else DN
+def up_dn(d): return UP if (d or 0)>=0 else DN
 
-# ── CSS ──────────────────────────────────────────────────────
+# ── CSS ─────────────────────────────────────────────────────
 st.markdown(f"""
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 @font-face{{font-family:'MaruBuri';src:url('https://cdn.jsdelivr.net/gh/wkdtjsgur100/maruburifonts@1.0/static/MaruBuri/MaruBuri-Regular.woff2') format('woff2');font-weight:400}}
 @font-face{{font-family:'MaruBuri';src:url('https://cdn.jsdelivr.net/gh/wkdtjsgur100/maruburifonts@1.0/static/MaruBuri/MaruBuri-Bold.woff2') format('woff2');font-weight:700}}
-html,body,[class*="css"]{{
-  background-color:{BG}!important;
-  color:{TXT}!important;
-  font-family:'MaruBuri','Gowun Batang',serif!important;
-  letter-spacing:.015em!important;
-  line-height:1.3!important;
-}}
+html,body,[class*="css"]{{background-color:{BG}!important;color:{TXT}!important;
+  font-family:'MaruBuri','Gowun Batang',serif!important;letter-spacing:.015em!important;line-height:1.3!important}}
 .block-container{{padding:0 2rem 3rem!important;max-width:100%!important;background:transparent!important}}
 [data-testid="stAppViewContainer"]{{background-color:{BG}!important}}
 [data-testid="stHeader"]{{background:transparent!important;height:0}}
 section[data-testid="stSidebar"]{{display:none}}
 #MainMenu,footer,header{{visibility:hidden}}
 p,span,div,label,th,td{{color:{TXT}!important;letter-spacing:.015em!important}}
-/* 버튼 */
-.stButton>button{{
-  background-color:{C2}!important;color:{TXT}!important;
-  border:1px solid {BORD}!important;border-radius:8px!important;
-  font-family:'MaruBuri',serif!important;padding:6px 16px!important;
+.stButton>button{{background-color:{C2}!important;color:{TXT}!important;border:1px solid {BORD}!important;
+  border-radius:8px!important;font-family:'MaruBuri',serif!important;padding:6px 16px!important;
   font-size:13px!important;box-shadow:none!important}}
 .stButton>button:hover{{border-color:{B5}!important;color:{B5}!important;background:{C2}!important}}
 .stButton>button:active,.stButton>button:focus{{border-color:{B5}!important;color:{B5}!important;background:{C2}!important;box-shadow:none!important}}
-/* KPI 그리드 */
 .kpi-grid{{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;flex:1}}
 </style>
 """, unsafe_allow_html=True)
@@ -88,86 +65,90 @@ def load(fn):
 fred=load("fred_indicators.parquet"); market=load("market_prices.parquet")
 sentiment=load("sentiment.parquet");  ecos=load("ecos_latest.parquet")
 
-def lat(df,ind):
-    if df.empty: return None
-    s=df[df["indicator"]==ind].sort_values("date")
+# ── 헬퍼 함수 (방어적 처리 강화) ────────────────────────────
+def lat(df, ind):
+    """최신 행 반환. 없으면 None."""
+    if df.empty or "indicator" not in df.columns: return None
+    s = df[df["indicator"]==ind].sort_values("date")
     return s.iloc[-1] if not s.empty else None
 
-def ser(df,ind,days=365):
-    if df.empty: return pd.DataFrame()
-    s=df[df["indicator"]==ind].copy()
-    if days: s=s[s["date"]>=pd.Timestamp.now()-pd.Timedelta(days=days)]
+def ser(df, ind, days=365):
+    """지표 시계열 반환. 없으면 빈 DataFrame."""
+    if df.empty or "indicator" not in df.columns: return pd.DataFrame()
+    s = df[df["indicator"]==ind].copy()
+    if days: s = s[s["date"] >= pd.Timestamp.now()-pd.Timedelta(days=days)]
     return s.sort_values("date")
 
-def dlt(df,ind):
-    s=ser(df,ind,15)          # ser() 내부에서 이미 date 정렬됨
-    if s.empty: return None   # 빈 경우 None 반환
+def dlt(df, ind):
+    """전일 대비 변화량. ser()는 이미 정렬됨."""
+    s = ser(df, ind, 15)
+    if s.empty: return None
     return (s.iloc[-1]["value"]-s.iloc[-2]["value"]) if len(s)>=2 else None
 
 def pct_chg_1d(ind):
-    s=ser(market,ind,10).sort_values("date")
-    if len(s)<2: return 0.0
-    try: return round((s.iloc[-1]["value"]/s.iloc[-2]["value"]-1)*100,2)
+    """전일 대비 % 변화. ser()는 이미 정렬됨."""
+    s = ser(market, ind, 10)
+    if s.empty or len(s)<2: return 0.0
+    try: return round((s.iloc[-1]["value"]/s.iloc[-2]["value"]-1)*100, 2)
     except: return 0.0
 
 def get_ecos_val(keyword):
     if ecos.empty or "KEYSTAT_NAME" not in ecos.columns: return None
-    r=ecos[ecos["KEYSTAT_NAME"].str.contains(keyword,na=False,regex=False)]
+    r = ecos[ecos["KEYSTAT_NAME"].str.contains(keyword, na=False, regex=False)]
     if r.empty and "(" in keyword:
-        r=ecos[ecos["KEYSTAT_NAME"].str.contains(keyword.split("(")[0],na=False,regex=False)]
+        r = ecos[ecos["KEYSTAT_NAME"].str.contains(keyword.split("(")[0], na=False, regex=False)]
     if r.empty: return None
     try:
-        raw=str(r.iloc[0]["DATA_VALUE"]).replace(",","").replace("%","").strip()
+        raw = str(r.iloc[0]["DATA_VALUE"]).replace(",","").replace("%","").strip()
         return float(raw)
     except: return None
 
-def yrange(*args,pad_pct=0.08):
-    vals=[]
+def yrange(*args, pad_pct=0.08):
+    vals = []
     for arg in args:
         if arg is None: continue
         try:
-            if isinstance(arg,pd.DataFrame) and not arg.empty and "value" in arg.columns:
+            if isinstance(arg, pd.DataFrame) and not arg.empty and "value" in arg.columns:
                 vals.extend(arg["value"].dropna().tolist())
-            elif isinstance(arg,pd.Series) and not arg.empty:
+            elif isinstance(arg, pd.Series) and not arg.empty:
                 vals.extend(arg.dropna().tolist())
         except: pass
     if not vals: return None
-    mn,mx=min(vals),max(vals)
-    if mn==mx: return [mn-1,mx+1]
-    pad=(mx-mn)*pad_pct
-    return [mn-pad,mx+pad]
+    mn, mx = min(vals), max(vals)
+    if mn==mx: return [mn-1, mx+1]
+    pad = (mx-mn)*pad_pct
+    return [mn-pad, mx+pad]
 
-def srange(series,pad_pct=0.08):
+def srange(series, pad_pct=0.08):
     try:
-        vals=series.dropna().tolist()
+        vals = series.dropna().tolist()
         if not vals: return None
-        mn,mx=min(vals),max(vals)
-        if mn==mx: return [mn-1,mx+1]
+        mn, mx = min(vals), max(vals)
+        if mn==mx: return [mn-1, mx+1]
         return [mn-(mx-mn)*pad_pct, mx+(mx-mn)*pad_pct]
     except: return None
 
-def ma(df,ind,window,days=None):
-    total=(days or 365)+window*2
-    s=ser(df,ind,total)           # ser() 내부에서 이미 정렬됨
-    if s.empty: return pd.DataFrame()
-    if len(s)<window: return pd.DataFrame()
-    s=s.copy(); s["value"]=s["value"].rolling(window).mean()
-    if days: s=s[s["date"]>=pd.Timestamp.now()-pd.Timedelta(days=days)]
+def ma(df, ind, window, days=None):
+    """이동평균. ser()는 이미 정렬됨."""
+    s = ser(df, ind, (days or 365)+window*2)
+    if s.empty or len(s)<window: return pd.DataFrame()
+    s = s.copy(); s["value"] = s["value"].rolling(window).mean()
+    if days: s = s[s["date"] >= pd.Timestamp.now()-pd.Timedelta(days=days)]
     return s.dropna()
 
-def spark(df,ind,color=B5,days=90,w=70,h=28):
-    s=ser(df,ind,days)
-    vals=s["value"].dropna().tolist() if not s.empty else []
+def spark(df, ind, color=B5, days=90, w=70, h=28):
+    s = ser(df, ind, days)
+    vals = s["value"].dropna().tolist() if not s.empty else []
     if len(vals)<3: return ""
-    mn,mx=min(vals),max(vals); mg=3
+    mn, mx = min(vals), max(vals); mg=3
     if mn==mx:
-        pts=[(round(i*w/(len(vals)-1),1),h/2) for i in range(len(vals))]
+        pts = [(round(i*w/(len(vals)-1),1), h/2) for i in range(len(vals))]
     else:
-        pts=[(round(i*w/(len(vals)-1),1),round(h-mg-(v-mn)/(mx-mn)*(h-mg*2),1)) for i,v in enumerate(vals)]
-    ld="M "+" L ".join(f"{x},{y}" for x,y in pts)
-    fd=ld+f" L {pts[-1][0]},{h} L {pts[0][0]},{h} Z"
-    gid=f"g{''.join(c for c in ind if c.isalpha())[:6]}"
-    lx,ly=pts[-1]
+        pts = [(round(i*w/(len(vals)-1),1), round(h-mg-(v-mn)/(mx-mn)*(h-mg*2),1)) for i,v in enumerate(vals)]
+    ld = "M "+" L ".join(f"{x},{y}" for x,y in pts)
+    fd = ld+f" L {pts[-1][0]},{h} L {pts[0][0]},{h} Z"
+    gid = f"g{''.join(c for c in ind if c.isalpha())[:6]}"
+    lx, ly = pts[-1]
     return (f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">'
             f'<defs><linearGradient id="{gid}" x1="0" y1="0" x2="0" y2="1">'
             f'<stop offset="0%" stop-color="{color}" stop-opacity=".35"/>'
@@ -178,7 +159,7 @@ def spark(df,ind,color=B5,days=90,w=70,h=28):
             f'<circle cx="{lx}" cy="{ly}" r="2" fill="{color}"/></svg>')
 
 def get_bull_html():
-    bp=ASSET_DIR/"bull.png"
+    bp = ASSET_DIR/"bull.png"
     if bp.exists():
         try:
             with open(bp,"rb") as f: b64=base64.b64encode(f.read()).decode()
@@ -186,7 +167,7 @@ def get_bull_html():
         except: pass
     return f'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:56px">🐂</div>'
 
-# ── 한국 기준금리 이력 (BOK 결정 이력 하드코딩) ──────────────
+# ── 한국 기준금리 이력 ────────────────────────────────────────
 KOR_BASE_HISTORY=[
     (date(2020,3,16),0.75),(date(2020,5,28),0.50),
     (date(2021,8,26),0.75),(date(2021,11,25),1.00),
@@ -200,125 +181,116 @@ KOR_BASE_HISTORY=[
 ]
 
 def kor_base_series(days=730):
-    cutoff=pd.Timestamp.now()-pd.Timedelta(days=days)
-    rows=[]
-    for d,r in KOR_BASE_HISTORY:
-        ts=pd.Timestamp(d)
-        if ts>=cutoff-pd.Timedelta(days=30):
-            rows.append({"date":ts,"value":r})
+    cutoff = pd.Timestamp.now()-pd.Timedelta(days=days)
+    rows = []
+    for d, r in KOR_BASE_HISTORY:
+        ts = pd.Timestamp(d)
+        if ts >= cutoff-pd.Timedelta(days=30):
+            rows.append({"date": ts, "value": r})
     if not rows:
-        rows=[{"date":pd.Timestamp(KOR_BASE_HISTORY[-1][0]),"value":KOR_BASE_HISTORY[-1][1]}]
-    rows.append({"date":pd.Timestamp.now(),"value":rows[-1]["value"]})
-    df=pd.DataFrame(rows)
+        rows = [{"date": pd.Timestamp(KOR_BASE_HISTORY[-1][0]), "value": KOR_BASE_HISTORY[-1][1]}]
+    rows.append({"date": pd.Timestamp.now(), "value": rows[-1]["value"]})
+    df = pd.DataFrame(rows)
     return df[df["date"]>=cutoff]
 
 # ── Plotly 기본 레이아웃 ─────────────────────────────────────
-def BL(title="",h=270):
+def BL(title="", h=270):
     return dict(
-        paper_bgcolor=CARD,plot_bgcolor=CARD,
-        font=dict(family="JetBrains Mono",size=10,color=SUB),
-        title=dict(text=title,font=dict(size=11,color=SUB,family="MaruBuri,serif"),x=0.01),
-        height=h,margin=dict(l=8,r=8,t=28,b=8),
-        legend=dict(orientation="h",y=1.08,x=0,font=dict(size=9,color=SUB),bgcolor="rgba(0,0,0,0)"),
+        paper_bgcolor=CARD, plot_bgcolor=CARD,
+        font=dict(family="JetBrains Mono", size=10, color=SUB),
+        title=dict(text=title, font=dict(size=11, color=SUB, family="MaruBuri,serif"), x=0.01),
+        height=h, margin=dict(l=8,r=8,t=28,b=8),
+        legend=dict(orientation="h", y=1.08, x=0, font=dict(size=9, color=SUB), bgcolor="rgba(0,0,0,0)"),
         hovermode="x unified",
-        hoverlabel=dict(bgcolor=C2,bordercolor=BORD,font=dict(family="JetBrains Mono",size=10,color=TXT)),
-        xaxis=dict(showgrid=True,gridcolor=G,zeroline=False,showline=False,tickfont=dict(size=9,color=MUT)),
-        yaxis=dict(showgrid=True,gridcolor=G,zeroline=False,showline=False,tickfont=dict(size=9,color=MUT)),
+        hoverlabel=dict(bgcolor=C2, bordercolor=BORD, font=dict(family="JetBrains Mono", size=10, color=TXT)),
+        xaxis=dict(showgrid=True, gridcolor=G, zeroline=False, showline=False, tickfont=dict(size=9, color=MUT)),
+        yaxis=dict(showgrid=True, gridcolor=G, zeroline=False, showline=False, tickfont=dict(size=9, color=MUT)),
     )
 
-def lc(traces,title="",h=270,zero=False):
-    fig=go.Figure(); all_dfs=[]
-    for df_,nm,clr in traces:
-        if isinstance(df_,pd.DataFrame) and not df_.empty:
-            fig.add_trace(go.Scatter(x=df_["date"],y=df_["value"],name=nm,
-                line=dict(color=clr,width=2),
+def lc(traces, title="", h=270, zero=False):
+    fig = go.Figure(); all_dfs = []
+    for df_, nm, clr in traces:
+        if isinstance(df_, pd.DataFrame) and not df_.empty:
+            fig.add_trace(go.Scatter(x=df_["date"], y=df_["value"], name=nm,
+                line=dict(color=clr, width=2),
                 hovertemplate=f"<b>{nm}</b> %{{y:.2f}}<extra></extra>"))
             all_dfs.append(df_)
-    if zero: fig.add_hline(y=0,line_dash="dot",line_color=MUT,line_width=1)
-    lay=BL(title,h); yr=yrange(*all_dfs)
-    if yr: lay["yaxis"]["range"]=yr
+    if zero: fig.add_hline(y=0, line_dash="dot", line_color=MUT, line_width=1)
+    lay = BL(title, h); yr = yrange(*all_dfs)
+    if yr: lay["yaxis"]["range"] = yr
     fig.update_layout(**lay)
     return fig
 
-# ── 히트맵 (빨강-초록, 다크) ────────────────────────────────
+# ── 히트맵 ───────────────────────────────────────────────────
 HM_SCALE=[
     [0.00,"#67000D"],[0.25,"#A50F15"],[0.40,"#CB181D"],
     [0.47,"#1C2128"],[0.53,"#1C2128"],
     [0.60,"#00441B"],[0.75,"#238B45"],[1.00,"#41AB5D"],
 ]
 
-def make_treemap(stocks,title="",h=580):
-    labels,parents,values,colors,cdata=[],[],[],[],[]
+def make_treemap(stocks, title="", h=580):
+    labels,parents,values,colors,cdata = [],[],[],[],[]
     for ind,(name,mcap) in stocks.items():
-        chg=pct_chg_1d(ind)
+        chg = pct_chg_1d(ind)
         labels.append(name); parents.append(""); values.append(mcap); colors.append(chg)
-        sign="▲" if chg>=0 else "▼"; cdata.append(f"{sign}{abs(chg):.2f}%")
-    fig=go.Figure(go.Treemap(
-        labels=labels,parents=parents,values=values,customdata=cdata,
+        cdata.append(f"{'▲' if chg>=0 else '▼'}{abs(chg):.2f}%")
+    fig = go.Figure(go.Treemap(
+        labels=labels, parents=parents, values=values, customdata=cdata,
         texttemplate="<b>%{label}</b><br>%{customdata}",
-        textfont=dict(size=10,color="#FFFFFF",family="MaruBuri"),
-        tiling=dict(packing="squarify",squarifyratio=1),
-        marker=dict(
-            colors=colors,colorscale=HM_SCALE,
-            cmid=0,cmin=-5,cmax=5,showscale=True,
-            colorbar=dict(thickness=10,len=0.4,ticksuffix="%",
-                tickfont=dict(size=9,color=MUT),
-                title=dict(text="등락",font=dict(size=9,color=MUT))),
-        ),
+        textfont=dict(size=10, color="#FFFFFF", family="MaruBuri"),
+        tiling=dict(packing="squarify", squarifyratio=1),
+        marker=dict(colors=colors, colorscale=HM_SCALE, cmid=0, cmin=-5, cmax=5, showscale=True,
+            colorbar=dict(thickness=10, len=0.4, ticksuffix="%",
+                tickfont=dict(size=9, color=MUT),
+                title=dict(text="등락", font=dict(size=9, color=MUT)))),
         hovertemplate="<b>%{label}</b> | 전일대비: %{customdata}<extra></extra>",
     ))
-    fig.update_layout(title=dict(text=title,font=dict(size=11,color=SUB,family="MaruBuri"),x=0.01),
-        paper_bgcolor=CARD,height=h,margin=dict(l=0,r=0,t=30,b=0))
+    fig.update_layout(
+        title=dict(text=title, font=dict(size=11, color=SUB, family="MaruBuri"), x=0.01),
+        paper_bgcolor=CARD, height=h, margin=dict(l=0,r=0,t=30,b=0))
     return fig
 
-# ── 레짐 ──────────────────────────────────────────────────────
+# ── 레짐 ─────────────────────────────────────────────────────
 def regime():
-    v=lat(market,"VIX"); h_=lat(fred,"HY_OAS")
+    v = lat(market,"VIX"); h_ = lat(fred,"HY_OAS")
     if v is None or h_ is None: return "neu","NEUTRAL","—","데이터 수집 중"
-    vv,hv=v["value"],h_["value"]
-    if vv>28 or hv>5.5:
-        return "risk","RISK-OFF",f"VIX {vv:.1f} · HY {hv:.2f}%","위험회피 — 현금·방어주·금 비중 확대"
-    elif vv<16 and hv<3.5:
-        return "on","RISK-ON",f"VIX {vv:.1f} · HY {hv:.2f}%","위험선호 — 성장주·고베타 유리"
-    else:
-        return "neu","NEUTRAL",f"VIX {vv:.1f} · HY {hv:.2f}%","관망 — 추가 확인 후 포지션 조정"
+    vv, hv = v["value"], h_["value"]
+    if vv>28 or hv>5.5: return "risk","RISK-OFF",f"VIX {vv:.1f} · HY {hv:.2f}%","위험회피 — 현금·방어주·금 비중 확대"
+    elif vv<16 and hv<3.5: return "on","RISK-ON",f"VIX {vv:.1f} · HY {hv:.2f}%","위험선호 — 성장주·고베타 유리"
+    else: return "neu","NEUTRAL",f"VIX {vv:.1f} · HY {hv:.2f}%","관망 — 추가 확인 후 포지션 조정"
 
-rc,rt,rn,reg_explain=regime()
-RC={"risk":(DN,"rgba(248,81,73,.15)","rgba(248,81,73,.4)"),
-    "on":  (UP,"rgba(63,185,80,.15)","rgba(63,185,80,.4)"),
-    "neu": (SUB,C2,BORD)}
-rc_t,rc_bg,rc_bd=RC[rc]
+rc,rt,rn,reg_explain = regime()
+RC = {"risk":(DN,"rgba(248,81,73,.15)","rgba(248,81,73,.4)"),
+      "on":  (UP,"rgba(63,185,80,.15)","rgba(63,185,80,.4)"),
+      "neu": (SUB,C2,BORD)}
+rc_t,rc_bg,rc_bd = RC[rc]
 
-DESC={
-    "SPX":    "S&P500 · 위험선호 기준",
-    "NASDAQ": "나스닥 · 고금리 민감",
-    "KOSPI":  "韓 대형주 · 외국인 민감",
-    "KOSDAQ": "코스닥 · 성장·기술주",
-    "VIX":    "옵션 변동성 · 25↑경계",
-    "USDKRW": "원달러 · 1,300↑주의",
-    "US_10Y": "美 10년 · 자본비용",
+DESC = {
+    "SPX":"S&P500 · 위험선호 기준","NASDAQ":"나스닥 · 고금리 민감",
+    "KOSPI":"韓 대형주 · 외국인 민감","KOSDAQ":"코스닥 · 성장·기술주",
+    "VIX":"옵션 변동성 · 25↑경계","USDKRW":"원달러 · 1,300↑주의","US_10Y":"美 10년 · 자본비용",
 }
 
 # ── KPI 카드 ─────────────────────────────────────────────────
-def kcard_html(label,ind,df_,fmt=".2f",inv=False):
-    r=lat(df_,ind); d=dlt(df_,ind)
-    clr=up_dn(d if not inv else ((-d) if d else None))
-    desc=DESC.get(ind,"")
-    desc_h=f'<div style="font-size:8px;color:{MUT};line-height:1.2;margin:1px 0 3px">{desc}</div>'
-    CS=(f"background:{CARD};border:1px solid {BORD};border-left:3px solid {clr};"
-        f"border-radius:8px;padding:8px 9px;font-family:'MaruBuri',serif;"
-        f"display:flex;justify-content:space-between;gap:6px;align-items:stretch")
+def kcard_html(label, ind, df_, fmt=".2f", inv=False):
+    r = lat(df_, ind); d = dlt(df_, ind)
+    clr = up_dn(d if not inv else ((-d) if d else None))
+    desc = DESC.get(ind,"")
+    desc_h = f'<div style="font-size:8px;color:{MUT};line-height:1.2;margin:1px 0 3px">{desc}</div>'
+    CS = (f"background:{CARD};border:1px solid {BORD};border-left:3px solid {clr};"
+          f"border-radius:8px;padding:8px 9px;font-family:'MaruBuri',serif;"
+          f"display:flex;justify-content:space-between;gap:6px;align-items:stretch")
     if r is None:
         return (f'<div style="{CS.replace(clr,MUT)}">'
                 f'<div style="flex:1"><div style="font-size:9px;color:{MUT};text-transform:uppercase">{label}</div>'
                 f'{desc_h}<div style="font-size:15px;font-weight:700;color:{TXT}">—</div></div></div>')
-    vs=format(r["value"],fmt); dh=""
+    vs = format(r["value"], fmt); dh = ""
     if d is not None:
-        sym="▲" if d>0 else "▼"
-        dh=(f'<div style="font-size:8px;font-weight:600;color:{clr};margin-top:1px">'
-            f'{sym}{abs(d):.2f} <span style="color:{MUT};font-weight:400">전일</span></div>')
-    spk=spark(df_,ind,color=clr,w=62,h=24)
-    spkd=f'<div style="flex:0 0 auto;align-self:center;opacity:.75">{spk}</div>' if spk else ""
+        sym = "▲" if d>0 else "▼"
+        dh = (f'<div style="font-size:8px;font-weight:600;color:{clr};margin-top:1px">'
+              f'{sym}{abs(d):.2f} <span style="color:{MUT};font-weight:400">전일</span></div>')
+    spk = spark(df_, ind, color=clr, w=62, h=24)
+    spkd = f'<div style="flex:0 0 auto;align-self:center;opacity:.75">{spk}</div>' if spk else ""
     return (f'<div style="{CS}">'
             f'<div style="flex:1;min-width:0">'
             f'<div style="font-size:9px;color:{MUT};text-transform:uppercase;letter-spacing:.05em">{label}</div>'
@@ -333,16 +305,15 @@ def fg_color_val(v):
     elif v<75: return "#52B788","탐욕"
     else:      return UP,"극도탐욕"
 
-# ── 섹션 헤더 ─────────────────────────────────────────────────
-def sh(num,name_ko,name_en=""):
-    en=f'<span style="font-size:11px;color:{MUT};margin-left:10px;font-family:sans-serif">{name_en}</span>' if name_en else ""
+def sh(num, name_ko, name_en=""):
+    en = f'<span style="font-size:11px;color:{MUT};margin-left:10px;font-family:sans-serif">{name_en}</span>' if name_en else ""
     st.markdown(f"""
 <div style="margin:2.2rem 0 1.1rem;font-family:'MaruBuri',serif">
   <span style="font-size:22px;font-weight:700;color:{TXT};line-height:1.3;
     background:rgba(47,129,247,.22);padding:2px 8px;border-radius:4px">
     {num}. {name_ko}
   </span>{en}
-</div>""",unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
 
 def no_data(label=""):
     st.markdown(
@@ -353,59 +324,46 @@ def no_data(label=""):
         unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
-# 상단 고정 KPI (position:fixed — 완벽 고정)
+# 상단 고정 KPI
 # ══════════════════════════════════════════════════════════════
 KPI_SPECS=[
-    ("S&P500", "SPX",   market,",.0f",False),
-    ("NASDAQ", "NASDAQ",market,",.0f",False),
-    ("KOSPI",  "KOSPI", market,",.0f",False),
-    ("KOSDAQ", "KOSDAQ",market,",.0f",False),
-    ("VIX",    "VIX",   market,".1f", True),
-    ("USD/KRW","USDKRW",market,",.0f",True),
-    ("US 10Y", "US_10Y",fred,  ".2f", True),
+    ("S&P500","SPX",market,",.0f",False),("NASDAQ","NASDAQ",market,",.0f",False),
+    ("KOSPI","KOSPI",market,",.0f",False),("KOSDAQ","KOSDAQ",market,",.0f",False),
+    ("VIX","VIX",market,".1f",True),("USD/KRW","USDKRW",market,",.0f",True),
+    ("US 10Y","US_10Y",fred,".2f",True),
 ]
-kpi_html="".join(kcard_html(l,i,d,f,iv) for l,i,d,f,iv in KPI_SPECS)
+kpi_html = "".join(kcard_html(l,i,d,f,iv) for l,i,d,f,iv in KPI_SPECS)
 
 st.markdown(f"""
-<div id="kpi-fixed" style="
-  position:fixed;top:0;left:0;right:0;z-index:99999;
-  background:{BG};
-  padding:12px 2rem 10px;
-  border-bottom:1px solid {BORD}">
-
+<div id="kpi-fixed" style="position:fixed;top:0;left:0;right:0;z-index:99999;
+  background:{BG};padding:12px 2rem 10px;border-bottom:1px solid {BORD}">
   <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px">
     <div>
-      <div style="font-family:'MaruBuri',serif;font-size:24px;font-weight:700;
-        color:{TXT};font-style:italic;line-height:1.2">
-        <span style="background:rgba(47,129,247,.28);padding:1px 8px;border-radius:5px">
-          Deokyoon's Monitoring
-        </span>
+      <div style="font-family:'MaruBuri',serif;font-size:24px;font-weight:700;color:{TXT};font-style:italic;line-height:1.2">
+        <span style="background:rgba(47,129,247,.28);padding:1px 8px;border-radius:5px">Deokyoon's Monitoring</span>
       </div>
       <div style="font-size:10px;color:{MUT};margin-top:3px">{now.strftime("%Y-%m-%d %H:%M")} KST · 전일 종가 기준</div>
     </div>
     <div style="text-align:right">
-      <div style="background:{rc_bg};color:{rc_t};border:1px solid {rc_bd};
-        padding:4px 14px;border-radius:14px;font-size:10px;font-weight:600;
-        display:inline-block;font-family:'JetBrains Mono',monospace">● {rt}</div>
+      <div style="background:{rc_bg};color:{rc_t};border:1px solid {rc_bd};padding:4px 14px;border-radius:14px;
+        font-size:10px;font-weight:600;display:inline-block;font-family:'JetBrains Mono',monospace">● {rt}</div>
       <div style="font-size:9.5px;color:{SUB};margin-top:3px;font-family:'MaruBuri',serif">{reg_explain}</div>
       <div style="font-size:8.5px;color:{MUT};margin-top:1px">{rn}</div>
     </div>
   </div>
-
   <div style="display:flex;gap:12px;align-items:stretch;min-height:120px">
-    <div style="flex:0 0 128px;background:{CARD};border:1px solid {BORD};
-      border-radius:10px;overflow:hidden">{get_bull_html()}</div>
+    <div style="flex:0 0 128px;background:{CARD};border:1px solid {BORD};border-radius:10px;overflow:hidden">{get_bull_html()}</div>
     <div class="kpi-grid">{kpi_html}</div>
   </div>
 </div>
 <div style="height:240px"></div>
-""",unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
 # 1. 시장 심리
 # ══════════════════════════════════════════════════════════════
 sh("1","시장 심리","Market Sentiment")
-c1,c2,c3=st.columns([1.1,0.9,0.9])
+c1,c2,c3 = st.columns([1.1,0.9,0.9])
 
 with c1:
     vix_s=ser(market,"VIX"); hy_s=ser(fred,"HY_OAS")
@@ -429,8 +387,7 @@ with c2:
         fig.add_trace(go.Scatter(x=sp_s["date"],y=sp_s["value"],name="2Y-10Y 스프레드",
             line=dict(color=B5,width=2),hovertemplate="<b>스프레드</b> %{y:.2f}%<extra></extra>"))
         fig.add_hline(y=0,line_dash="dot",line_color=MUT,line_width=1.5,
-                      annotation_text="장단기 역전 기준",annotation_font_color=MUT,
-                      annotation_position="bottom right")
+                      annotation_text="장단기 역전 기준",annotation_font_color=MUT,annotation_position="bottom right")
         lay=BL("2Y-10Y 스프레드 — 음수=경기침체 신호",270)
         yr=yrange(sp_s)
         if yr: lay["yaxis"]["range"]=yr
@@ -445,33 +402,23 @@ with c3:
             mode="gauge+number",value=fv,domain={"x":[0,1],"y":[0,1]},
             number={"font":{"size":38,"family":"MaruBuri","color":TXT}},
             title={"text":f'CNN F&G  ·  {fl}',"font":{"size":11,"color":fc}},
-            gauge={
-                "axis":{"range":[0,100],"tickwidth":0,
-                    "tickvals":[0,25,50,75,100],
-                    "ticktext":["극공포","공포","중립","탐욕","극탐욕"],
+            gauge={"axis":{"range":[0,100],"tickwidth":0,
+                    "tickvals":[0,25,50,75,100],"ticktext":["극공포","공포","중립","탐욕","극탐욕"],
                     "tickfont":{"size":8,"color":MUT}},
-                "bar":{"color":fc,"thickness":0.2},
-                "bgcolor":C2,"borderwidth":0,
-                "steps":[
-                    {"range":[0,25],"color":"rgba(248,81,73,.18)"},
-                    {"range":[25,45],"color":"rgba(244,162,97,.12)"},
-                    {"range":[45,55],"color":"rgba(110,118,129,.12)"},
-                    {"range":[55,75],"color":"rgba(82,183,136,.12)"},
-                    {"range":[75,100],"color":"rgba(63,185,80,.18)"},
-                ],
-                "threshold":{"line":{"color":TXT,"width":2},"thickness":0.7,"value":fv},
-            }))
+                "bar":{"color":fc,"thickness":0.2},"bgcolor":C2,"borderwidth":0,
+                "steps":[{"range":[0,25],"color":"rgba(248,81,73,.18)"},{"range":[25,45],"color":"rgba(244,162,97,.12)"},
+                          {"range":[45,55],"color":"rgba(110,118,129,.12)"},{"range":[55,75],"color":"rgba(82,183,136,.12)"},
+                          {"range":[75,100],"color":"rgba(63,185,80,.18)"}],
+                "threshold":{"line":{"color":TXT,"width":2},"thickness":0.7,"value":fv}}))
         fig.update_layout(paper_bgcolor=CARD,height=270,margin=dict(l=20,r=20,t=46,b=15))
         st.plotly_chart(fig,use_container_width=True)
     else: no_data("F&G 수집 중")
 
 # ══════════════════════════════════════════════════════════════
 # 2. 금리 & 통화정책
-#    좌: 한국 (기준금리 step + 국고채 수평선)
-#    우: 미국 (FFR step + 국채 3Y/10Y/30Y)
 # ══════════════════════════════════════════════════════════════
 sh("2","금리 & 통화정책","Rates & Monetary Policy")
-c1,c2=st.columns(2)
+c1,c2 = st.columns(2)
 
 with c1:
     fig=go.Figure()
@@ -480,13 +427,13 @@ with c1:
         fig.add_trace(go.Scatter(x=kor_df["date"],y=kor_df["value"],name="한국 기준금리",
             line=dict(color=UP,width=2.5,shape="hv"),
             hovertemplate="<b>한국 기준금리</b> %{y:.2f}%<extra></extra>"))
-    kor_3y=get_ecos_val("국고채수익률(3년)") or get_ecos_val("국고채(3년)")
-    kor_5y=get_ecos_val("국고채수익률(5년)") or get_ecos_val("국고채(5년)")
+    kor_3y = get_ecos_val("국고채수익률(3년)") or get_ecos_val("국고채(3년)")
+    kor_5y = get_ecos_val("국고채수익률(5년)") or get_ecos_val("국고채(5년)")
     for val,lbl,clr in [(kor_3y,"국고채 3Y",B5),(kor_5y,"국고채 5Y",B7)]:
         if val:
             fig.add_hline(y=val,line_dash="dot",line_color=clr,line_width=1.8)
-            fig.add_annotation(x=0.02,xref="paper",y=val,yref="y",
-                text=f"{lbl} {val:.2f}%",showarrow=False,xanchor="left",yanchor="bottom",
+            fig.add_annotation(x=0.02,xref="paper",y=val,yref="y",text=f"{lbl} {val:.2f}%",
+                showarrow=False,xanchor="left",yanchor="bottom",
                 font=dict(color=clr,size=9,family="JetBrains Mono"),bgcolor=CARD,borderpad=2)
     lay=BL("한국 금리 — 기준금리 · 국고채 3Y/5Y",270)
     all_v=list(kor_df["value"].tolist() if not kor_df.empty else [])
@@ -520,11 +467,11 @@ with c2:
 # 3. 환율 & 달러
 # ══════════════════════════════════════════════════════════════
 sh("3","환율 & 달러","FX & Dollar")
-def norm_ser(df_,ind,days=365):
-    s=ser(df_,ind,days)
+def norm_ser(df_, ind, days=365):
+    s = ser(df_, ind, days)
     if len(s)<2: return pd.DataFrame()
-    base=s.iloc[0]["value"]
-    out=s.copy(); out["value"]=(out["value"]/base-1)*100
+    base = s.iloc[0]["value"]
+    out = s.copy(); out["value"] = (out["value"]/base-1)*100
     return out
 
 dxy_n=norm_ser(market,"DXY"); krw_n=norm_ser(market,"USDKRW"); jpy_n=norm_ser(market,"USDJPY")
@@ -544,11 +491,10 @@ if fig.data:
 else: no_data("환율 데이터")
 
 # ══════════════════════════════════════════════════════════════
-# 4. 미국 증시 — 좌: S&P500+MA  /  우: NASDAQ+MA
+# 4. 미국 증시
 # ══════════════════════════════════════════════════════════════
 sh("4","미국 증시","US Market")
-AX=dict(showgrid=True,gridcolor=G,zeroline=False,showline=False,tickfont=dict(size=9,color=MUT))
-c1,c2=st.columns(2)
+c1,c2 = st.columns(2)
 
 with c1:
     spx=ser(market,"SPX",days=400); spx50=ma(market,"SPX",50,days=400); spx200=ma(market,"SPX",200,days=400)
@@ -558,13 +504,11 @@ with c1:
             line=dict(color=B5,width=2),fill="tozeroy",fillcolor="rgba(47,129,247,.07)",
             hovertemplate="<b>S&P500</b> %{y:,.0f}<extra></extra>"))
     if not spx50.empty:
-        fig.add_trace(go.Scatter(x=spx50["date"],y=spx50["value"],name="MA50",
-            line=dict(color=UP,width=1.2,dash="dot")))
+        fig.add_trace(go.Scatter(x=spx50["date"],y=spx50["value"],name="MA50",line=dict(color=UP,width=1.2,dash="dot")))
     if not spx200.empty:
-        fig.add_trace(go.Scatter(x=spx200["date"],y=spx200["value"],name="MA200",
-            line=dict(color=MUT,width=1.2,dash="dash")))
+        fig.add_trace(go.Scatter(x=spx200["date"],y=spx200["value"],name="MA200",line=dict(color=MUT,width=1.2,dash="dash")))
     lay=BL("S&P500 + MA50/MA200",270)
-    yr=yrange(spx);
+    yr=yrange(spx)
     if yr: lay["yaxis"]["range"]=yr
     fig.update_layout(**lay); st.plotly_chart(fig,use_container_width=True)
 
@@ -576,11 +520,9 @@ with c2:
             line=dict(color=B4,width=2),fill="tozeroy",fillcolor="rgba(88,166,255,.07)",
             hovertemplate="<b>NASDAQ</b> %{y:,.0f}<extra></extra>"))
     if not nas50.empty:
-        fig.add_trace(go.Scatter(x=nas50["date"],y=nas50["value"],name="MA50",
-            line=dict(color=UP,width=1.2,dash="dot")))
+        fig.add_trace(go.Scatter(x=nas50["date"],y=nas50["value"],name="MA50",line=dict(color=UP,width=1.2,dash="dot")))
     if not nas200.empty:
-        fig.add_trace(go.Scatter(x=nas200["date"],y=nas200["value"],name="MA200",
-            line=dict(color=MUT,width=1.2,dash="dash")))
+        fig.add_trace(go.Scatter(x=nas200["date"],y=nas200["value"],name="MA200",line=dict(color=MUT,width=1.2,dash="dash")))
     lay=BL("NASDAQ + MA50/MA200",270)
     yr=yrange(nas)
     if yr: lay["yaxis"]["range"]=yr
@@ -624,10 +566,10 @@ US_STOCKS={
 st.plotly_chart(make_treemap(US_STOCKS,"미국 시총 TOP 100 히트맵",h=600),use_container_width=True)
 
 # ══════════════════════════════════════════════════════════════
-# 5. 한국 증시 — 좌: KOSPI+MA  /  우: KOSDAQ+MA
+# 5. 한국 증시
 # ══════════════════════════════════════════════════════════════
 sh("5","한국 증시","Korean Market")
-c1,c2=st.columns(2)
+c1,c2 = st.columns(2)
 
 with c1:
     ksp=ser(market,"KOSPI",days=400); ksp50=ma(market,"KOSPI",50,days=400); ksp200=ma(market,"KOSPI",200,days=400)
@@ -695,7 +637,7 @@ st.plotly_chart(make_treemap(KR_STOCKS,"한국 시총 TOP 60 히트맵 (KOSPI+KO
 # 6. 글로벌 증시
 # ══════════════════════════════════════════════════════════════
 sh("6","글로벌 증시","Global Equity")
-c1,c2,c3,c4=st.columns(4)
+c1,c2,c3,c4 = st.columns(4)
 for col,ind,title in [(c1,"NIKKEI","닛케이 (일본)"),(c2,"SHANGHAI","상해 (중국)"),
                        (c3,"HSI","항셍 (홍콩)"),(c4,"NIFTY","니프티 (인도)")]:
     with col:
@@ -705,8 +647,7 @@ for col,ind,title in [(c1,"NIKKEI","닛케이 (일본)"),(c2,"SHANGHAI","상해 
             fig=go.Figure(go.Scatter(x=s["date"],y=s["value"],line=dict(color=clr,width=2),
                 fill="tozeroy",fillcolor=f"rgba({'63,185,80' if chg>=0 else '248,81,73'},.07)",
                 hovertemplate="%{y:,.0f}<extra></extra>"))
-            sign="▲" if chg>=0 else "▼"
-            lay=BL(f"{title}\n{r['value']:,.0f}  {sign}{abs(chg):.2f}%",240)
+            lay=BL(f"{title}\n{r['value']:,.0f}  {'▲' if chg>=0 else '▼'}{abs(chg):.2f}%",240)
             yr=yrange(s)
             if yr: lay["yaxis"]["range"]=yr
             fig.update_layout(**lay); st.plotly_chart(fig,use_container_width=True)
@@ -733,7 +674,7 @@ def dual_chart(s1,s2,n1,n2,c1_,c2_,title):
     fig.update_yaxes(range=yrange(s2),secondary_y=True,showgrid=False,tickfont=dict(size=9,color=c2_))
     return fig
 
-c1,c2,c3=st.columns(3)
+c1,c2,c3 = st.columns(3)
 with c1:
     g_s=ser(market,"GOLD"); sv_s=ser(market,"SILVER")
     if not g_s.empty or not sv_s.empty: st.plotly_chart(dual_chart(g_s,sv_s,"금($)","은($)",B5,MUT,"금·은"),use_container_width=True)
@@ -751,7 +692,7 @@ with c3:
 # 8. 유동성
 # ══════════════════════════════════════════════════════════════
 sh("8","유동성","Liquidity")
-c1,c2=st.columns(2)
+c1,c2 = st.columns(2)
 with c1:
     fed_s=ser(fred,"FED_ASSETS",days=365*5)
     if not fed_s.empty: st.plotly_chart(lc([(fed_s,"연준 자산",B5)],"연준 자산 (QE↑ / QT↓)"),use_container_width=True)
@@ -765,7 +706,7 @@ with c2:
 # 9. 미국 매크로
 # ══════════════════════════════════════════════════════════════
 sh("9","미국 매크로","US Macro")
-c1,c2=st.columns(2)
+c1,c2 = st.columns(2)
 with c1:
     cpi=ser(fred,"US_CORE_CPI",days=365*6); pce=ser(fred,"US_CORE_PCE",days=365*6)
     fig=go.Figure(); yoy_dfs=[]
@@ -786,6 +727,7 @@ with c1:
         if yr: yr=[min(yr[0],1.5),max(yr[1],3.5)]; lay["yaxis"]["range"]=yr
         fig.update_layout(**lay); st.plotly_chart(fig,use_container_width=True)
     else: no_data("CPI·PCE")
+
 with c2:
     nfp=ser(fred,"US_NFP",days=365*4); ic=ser(fred,"US_INIT_CLAIMS",days=365*4)
     if not nfp.empty:
@@ -800,8 +742,12 @@ with c2:
                 hovertemplate="<b>신규 실업급여</b> %{y:,.0f}명<extra></extra>"),secondary_y=True)
         lay=BL("비농업 고용 MoM + 신규 실업급여",270)
         fig.update_layout(showlegend=True,**lay)
-        if yr_:=srange(nm_["mom"]): fig.update_yaxes(range=yr_,secondary_y=False)
-        if not ic.empty: fig.update_yaxes(range=yrange(ic),secondary_y=True,showgrid=False,tickfont=dict(size=9,color=B4))
+        # walrus operator 제거 → 명시적 변수 사용
+        yr_nfp=srange(nm_["mom"])
+        if yr_nfp: fig.update_yaxes(range=yr_nfp,secondary_y=False)
+        if not ic.empty:
+            yr_ic=yrange(ic)
+            if yr_ic: fig.update_yaxes(range=yr_ic,secondary_y=True,showgrid=False,tickfont=dict(size=9,color=B4))
         st.plotly_chart(fig,use_container_width=True)
     else: no_data("NFP")
 
@@ -816,7 +762,8 @@ st.markdown(f"""
   </span>
 </div>""",unsafe_allow_html=True)
 
-col_ecos,col_cal=st.columns([1,1.5])
+col_ecos,col_cal = st.columns([1,1.5])
+
 with col_ecos:
     st.markdown(f'<div style="font-size:14px;font-weight:600;color:{SUB};margin-bottom:8px">한국 매크로 · ECOS TOP 10</div>',unsafe_allow_html=True)
     ECOS_TOP=["한국은행 기준금리","국고채수익률","원/달러","KOSPI","수출","경상수지","M2","소비자물가","실업률","GDP"]
@@ -851,7 +798,7 @@ with col_ecos:
 
 with col_cal:
     st.markdown(f'<div style="font-size:14px;font-weight:600;color:{SUB};margin-bottom:4px">경제 캘린더</div>',unsafe_allow_html=True)
-    nav1,nav2,nav3=st.columns([1,3,1])
+    nav1,nav2,nav3 = st.columns([1,3,1])
     with nav1:
         if st.button("◀ 이전달",key="cal_prev"):
             if st.session_state.cal_month==1: st.session_state.cal_month=12; st.session_state.cal_year-=1
@@ -912,11 +859,11 @@ with col_cal:
             day_hd+=f'<div style="text-align:center;font-size:10px;font-weight:600;color:{dc2};padding:5px 0">{dn}</div>'
         cells=""
         for wk in weeks:
-            for day in wk:
-                if day==0:
+            for day_num in wk:
+                if day_num==0:
                     cells+=f'<div style="background:{BG};border-radius:6px;min-height:72px"></div>'
                 else:
-                    d=date(year,month,day); is_today=(d==today); is_past=(d<today)
+                    d=date(year,month,day_num); is_today=(d==today); is_past=(d<today)
                     evs=events.get(d,[])
                     ev_html=""
                     for ev_type,ev_name in evs[:2]:
@@ -927,12 +874,12 @@ with col_cal:
                                   f'white-space:nowrap;font-family:JetBrains Mono,monospace">{ev_short}</div>')
                     if len(evs)>2:
                         ev_html+=f'<div style="font-size:8px;color:{MUT}">+{len(evs)-2}</div>'
-                    if is_today: bg_d=B5; brd=f"2px solid {B5}"; day_c="#FFFFFF"
-                    elif is_past: bg_d=BG; brd=f"1px solid {BORD}"; day_c=MUT
-                    else: bg_d=CARD; brd=f"1px solid {BORD}"; day_c=TXT
+                    if is_today:   bg_d=B5; brd=f"2px solid {B5}"; day_c="#FFFFFF"
+                    elif is_past:  bg_d=BG; brd=f"1px solid {BORD}"; day_c=MUT
+                    else:          bg_d=CARD; brd=f"1px solid {BORD}"; day_c=TXT
                     cells+=(f'<div style="background:{bg_d};border:{brd};border-radius:6px;'
                              f'padding:5px;min-height:72px;overflow:hidden">'
-                             f'<div style="font-size:12px;font-weight:{"700" if is_today else "400"};color:{day_c}">{day}</div>'
+                             f'<div style="font-size:12px;font-weight:{"700" if is_today else "400"};color:{day_c}">{day_num}</div>'
                              f'{ev_html}</div>')
         legend=""
         for lbl,et in [("FOMC","fomc"),("금통위","bok"),("경제지표","econ"),("실적","earn")]:
