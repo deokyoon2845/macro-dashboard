@@ -148,7 +148,8 @@ def srange(series,pad_pct=0.08):
 
 def ma(df,ind,window,days=None):
     total=(days or 365)+window*2
-    s=ser(df,ind,total).sort_values("date")
+    s=ser(df,ind,total)           # ser() 내부에서 이미 정렬됨
+    if s.empty: return pd.DataFrame()
     if len(s)<window: return pd.DataFrame()
     s=s.copy(); s["value"]=s["value"].rolling(window).mean()
     if days: s=s[s["date"]>=pd.Timestamp.now()-pd.Timedelta(days=days)]
