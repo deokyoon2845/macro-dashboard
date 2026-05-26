@@ -9,7 +9,7 @@ from pathlib import Path
 from datetime import datetime, date, timedelta
 import base64, calendar as cal_lib
 
-st.set_page_config(page_title="Deokyoon's Monitoring",
+st.set_page_config(page_title="DY Monitoring",
                    page_icon="◈", layout="wide",
                    initial_sidebar_state="collapsed")
 
