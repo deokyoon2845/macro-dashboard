@@ -83,7 +83,7 @@ with col_logo:
 
 with col_info:
     v = lat(market,"VIX"); h = lat(fred,"HY_OAS")
-    if v and h:
+    if v is not None and h is not None:
         vv,hv = v["value"],h["value"]
         if vv>28 or hv>5.5:   rt,rc_bg,rc_t = "RISK-OFF","#FEF2F2",B6
         elif vv<16 and hv<3.5: rt,rc_bg,rc_t = "RISK-ON","#EFF6FF",B4
@@ -110,7 +110,7 @@ cols = st.columns(7)
 for col,(lbl,ind,df,fmt) in zip(cols,kpi_items):
     r=lat(df,ind); d=dlt(df,ind)
     with col:
-        if r:
+        if r is not None:
             clr = UP if (d or 0)>=0 else DN
             sign="▲" if (d or 0)>=0 else "▼"
             delta_str=f"{sign}{abs(d):.2f}" if d else "—"
