@@ -13,6 +13,24 @@ st.set_page_config(page_title="DY Monitoring",
                    page_icon="◈", layout="wide",
                    initial_sidebar_state="collapsed")
 
+st.set_page_config(
+    page_title="모니터링",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# ── 홈 버튼 ───────────────────────────── ← 여기에 추가
+with st.sidebar:
+    st.page_link("Home.py", label="🏠  홈으로 돌아가기", use_container_width=True)
+    st.markdown(
+        '<div style="height:1px;background:#222A3A;margin:8px 0 12px"></div>',
+        unsafe_allow_html=True
+    )
+
+# ── 다크 팔레트 ────────────────────────── ← 기존 색상 정의 계속
+BG = "#0A0D13"; CARD = "#111620" ...
+
 # ── 홈 버튼 ─────────────────────────────────────────────────
 with st.sidebar:
     st.page_link("Home.py", label="🏠  홈으로 돌아가기", use_container_width=True)
