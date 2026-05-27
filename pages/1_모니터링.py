@@ -340,7 +340,7 @@ st.markdown(f"""
   <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px">
     <div>
       <div style="font-family:'MaruBuri',serif;font-size:24px;font-weight:700;color:{TXT};font-style:italic;line-height:1.2">
-        <span style="background:rgba(47,129,247,.28);padding:1px 8px;border-radius:5px">Deokyoon's Monitoring</span>
+        <span style="background:rgba(47,129,247,.28);padding:1px 8px;border-radius:5px">DY Monitoring</span>
       </div>
       <div style="font-size:10px;color:{MUT};margin-top:3px">{now.strftime("%Y-%m-%d %H:%M")} KST · 전일 종가 기준</div>
     </div>
