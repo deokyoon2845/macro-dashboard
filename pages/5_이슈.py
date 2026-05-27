@@ -10,8 +10,16 @@ from datetime import datetime, timedelta
 st.set_page_config(page_title="이슈", page_icon="🔥", layout="wide",
                    initial_sidebar_state="expanded")
 
-BG="#0A0D13"; CARD="#111620"; C2="#161C28"; C3="#1C2438"; BORD="#222A3A"; G="#181F2C"
-TXT="#E4EAF6"; SUB="#7A8CA4"; MUT="#4A5668"; ACC="#4A82E4"; UP="#2ECC71"; DN="#E74C3C"
+# ── 다크 팔레트 (전 페이지 공통) ───────────────────────────
+BG    = "#0A0D13"; CARD  = "#111620"; C2    = "#161C28"
+C3    = "#1C2438"; BORD  = "#222A3A"; G     = "#181F2C"
+TXT   = "#E4EAF6"; SUB   = "#7A8CA4"; MUT   = "#4A5668"
+# 구버전 호환 변수 (PUR_HI, PUR_DK)
+PUR_HI = "#4A82E4"; PUR_DK = "#79C0FF"
+ACC   = "#4A82E4"; GOLD  = "#F5A623"
+UP    = "#2ECC71"; DN    = "#E74C3C"
+B1    = "#CAE8FF"; B3    = "#79C0FF"; B4    = "#58A6FF"
+B5    = "#388BFD"; B6    = "#2F81F7"; B7    = "#1F6FEB"; B8    = "#1158C7"
 
 st.markdown(f"""<style>
 html,body,[class*="css"]{{background-color:{BG}!important;color:{TXT}!important;
