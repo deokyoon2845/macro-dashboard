@@ -8,3 +8,4 @@ streamlit>=1.36.0
 plotly>=5.15.0
 pytrends
 openpyxl
+anthropic>=0.40.0
