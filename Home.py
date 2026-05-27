@@ -8,10 +8,8 @@ from datetime import datetime
 st.set_page_config(page_title="Deokyoon's Monitoring", page_icon="◈",
                    layout="wide", initial_sidebar_state="expanded")
 
-BG="#0D1117"; CARD="#161B22"; C2="#1C2128"; BORD="#30363D"
-TXT="#E6EDF3"; SUB="#8D96A0"; MUT="#6E7681"
-B5="#388BFD"; B6="#2F81F7"; B7="#1F6FEB"; B8="#1158C7"
-UP="#3FB950"; DN="#F85149"
+BG="#0A0D13"; CARD="#111620"; C2="#161C28"; C3="#1C2438"; BORD="#222A3A"; G="#181F2C"
+TXT="#E4EAF6"; SUB="#7A8CA4"; MUT="#4A5668"; ACC="#4A82E4"; UP="#2ECC71"; DN="#E74C3C"
 
 st.markdown(f"""
 <style>
