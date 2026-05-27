@@ -6,6 +6,7 @@ from plotly.subplots import make_subplots
 from pathlib import Path
 from datetime import datetime, date
 import json, uuid
+import numpy as np
 
 st.set_page_config(page_title="투자자산", page_icon="📈", layout="wide",
                    initial_sidebar_state="expanded")
@@ -89,7 +90,7 @@ NEWS_FILE   = DATA / "portfolio_news.json"
 DISC_FILE   = DATA / "portfolio_disclosures.json"
 
 SECTORS=["반도체","방산","증권·금융","우주항공","로봇·자동화","2차전지","바이오",
-         "IT·소프트웨어","엔터·미디어","자동차","화학","철강·소재","건설","유틸리티","소비재","에너지","기타"]
+         "IT·소프트웨어","엔터·미디어","자동차","화학","철강·소재","건설","유틸리티","소비재", "미용", "에너지","기타"]
 MARKETS=["KOSPI","KOSDAQ","NYSE","NASDAQ","기타"]
 
 # ── 데이터 함수 ──────────────────────────────────────────────
@@ -495,7 +496,8 @@ for col,(lbl,val,sub_,clr) in zip(ks_cols,kpi_strip_items):
 # 탭: 상세 테이블 / 뉴스 / 공시
 # ══════════════════════════════════════════════════════════════
 st.markdown(f'<div style="height:8px"></div>',unsafe_allow_html=True)
-t1,t2,t3=st.tabs(["📋 상세 테이블","📰 뉴스","📑 공시"])
+t1, t2, t3, t4 = st.tabs(["📋 상세 테이블", "📰 뉴스", "📑 공시", "📊 리스크"])
+
 
 with t1:
     df_sorted=df.sort_values("value_krw",ascending=False)
@@ -638,3 +640,209 @@ st.markdown(f"""
   가격 최종: {prices["date"].max().strftime("%Y-%m-%d") if not prices.empty else "—"}
   · USD/KRW: {usdkrw:,.0f}  · 매일 KST 07:00 자동수집
 </div>""",unsafe_allow_html=True)
+
+with t4:
+    if prices.empty or len(positions) < 2:
+        st.markdown(f"""
+<div style="background:{CARD};border:1px solid {BORD};border-radius:12px;
+  padding:40px;text-align:center">
+  <div style="font-size:14px;color:{SUB}">
+    종목이 2개 이상 등록되고 가격 데이터가 수집된 후 확인 가능합니다
+  </div>
+</div>""", unsafe_allow_html=True)
+    else:
+        # ── 헬퍼 함수 ─────────────────────────────────────────
+        def get_ret(ticker, days=None):
+            sub = prices[prices["ticker"]==ticker].sort_values("date")
+            if days: sub = sub.tail(days+1)
+            return sub["close"].pct_change().dropna()
+
+        def calc_beta(ticker, is_usd, days=90):
+            stock_ret = get_ret(ticker, days)
+            if len(stock_ret) < 20: return None
+            bench_ind = "SPX" if is_usd else "KOSPI"
+            if mdf.empty or "indicator" not in mdf.columns: return None
+            bench = mdf[mdf["indicator"]==bench_ind].sort_values("date")
+            if bench.empty: return None
+            bench_ret = bench.set_index("date")["value"].pct_change().dropna()
+            common = stock_ret.index.intersection(bench_ret.index)
+            if len(common) < 20: return None
+            s = stock_ret[common].values; b = bench_ret[common].values
+            var_b = np.var(b)
+            if var_b == 0: return None
+            return round(float(np.cov(s, b)[0,1] / var_b), 2)
+
+        def calc_vol(ticker, days=60):
+            ret = get_ret(ticker, days)
+            if len(ret) < 10: return None
+            return round(float(ret.std() * np.sqrt(252) * 100), 2)
+
+        def calc_mdd(ticker):
+            sub = prices[prices["ticker"]==ticker].sort_values("date")["close"]
+            if len(sub) < 5: return None
+            dd = (sub - sub.cummax()) / sub.cummax() * 100
+            return round(float(dd.min()), 2)
+
+        def calc_sharpe(ticker, rf=3.5, days=90):
+            ret = get_ret(ticker, days)
+            if len(ret) < 20: return None
+            ann = float(ret.mean() * 252 * 100)
+            vol = float(ret.std() * np.sqrt(252) * 100)
+            return round((ann - rf) / vol, 2) if vol > 0 else None
+
+        # ── 리스크 지표 테이블 ────────────────────────────────
+        st.markdown(f"""
+<div style="font-size:14px;font-weight:600;color:{SUB};
+  margin:1rem 0 10px;font-family:'Inter',sans-serif">리스크 지표 요약</div>
+""", unsafe_allow_html=True)
+
+        def badge(v, thresholds, fmt, reverse=False):
+            if v is None: return f'<span style="color:{MUT}">—</span>'
+            lo, hi = thresholds
+            if reverse:
+                clr = UP if v < lo else (GOLD if v < hi else DN)
+            else:
+                clr = DN if v < lo else (GOLD if v < hi else UP)
+            return f'<span style="color:{clr};font-weight:700;font-family:JetBrains Mono,monospace">{fmt.format(v)}</span>'
+
+        risk_rows = ""
+        for i, pos in enumerate(sorted(positions, key=lambda x:x["value_krw"], reverse=True)):
+            clr = HOLD_COLORS[i % len(HOLD_COLORS)]
+            t = pos["ticker"]; is_usd = pos["currency"] == "USD"
+            beta = calc_beta(t, is_usd)
+            vol  = calc_vol(t)
+            mdd  = calc_mdd(t)
+            sh   = calc_sharpe(t)
+            b_html  = badge(beta, (0.8, 1.3), "{:.2f}", reverse=False) if beta else f'<span style="color:{MUT}">—</span>'
+            v_html  = badge(vol,  (20, 35), "{:.1f}%", reverse=True)   if vol  else f'<span style="color:{MUT}">—</span>'
+            mdd_html= f'<span style="color:{DN};font-weight:700;font-family:JetBrains Mono,monospace">{mdd:.1f}%</span>' if mdd else f'<span style="color:{MUT}">—</span>'
+            sh_html = badge(sh, (0, 1), "{:.2f}")                       if sh   else f'<span style="color:{MUT}">—</span>'
+            risk_rows += f"""<tr style="border-bottom:1px solid {BORD}">
+  <td style="padding:.7rem 1rem">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="width:8px;height:8px;border-radius:50%;background:{clr};flex-shrink:0"></span>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:{TXT}">{pos['name']}</div>
+        <div style="font-size:9px;color:{MUT};font-family:'JetBrains Mono',monospace">{t}</div>
+      </div>
+    </div>
+  </td>
+  <td style="padding:.7rem 1rem;text-align:center">{b_html}</td>
+  <td style="padding:.7rem 1rem;text-align:center">{v_html}</td>
+  <td style="padding:.7rem 1rem;text-align:center">{mdd_html}</td>
+  <td style="padding:.7rem 1rem;text-align:center">{sh_html}</td>
+</tr>"""
+
+        TH_S = f"padding:.6rem 1rem;font-size:10px;color:{MUT};font-weight:500;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid {BORD};text-align:center"
+        st.markdown(f"""
+<div style="background:{CARD};border:1px solid {BORD};border-radius:12px;overflow:hidden">
+  <table style="width:100%;border-collapse:collapse">
+    <thead><tr style="background:{C2}">
+      <th style="{TH_S};text-align:left">종목</th>
+      <th style="{TH_S}">베타<br><span style="font-size:8px;color:{MUT};font-weight:400">90일·시장대비</span></th>
+      <th style="{TH_S}">변동성<br><span style="font-size:8px;color:{MUT};font-weight:400">60일·연환산</span></th>
+      <th style="{TH_S}">MDD<br><span style="font-size:8px;color:{MUT};font-weight:400">최대낙폭</span></th>
+      <th style="{TH_S}">샤프비율<br><span style="font-size:8px;color:{MUT};font-weight:400">90일·RF 3.5%</span></th>
+    </tr></thead>
+    <tbody>{risk_rows}</tbody>
+  </table>
+</div>""", unsafe_allow_html=True)
+
+        st.markdown(f"""
+<div style="background:{C2};border:1px solid {BORD};border-radius:8px;
+  padding:10px 14px;font-size:10px;color:{SUB};margin-top:8px;display:flex;gap:16px;flex-wrap:wrap">
+  <span>📊 <b style="color:{TXT}">베타</b> &lt;0.8 방어 · 0.8~1.3 중립 · &gt;1.3 공격</span>
+  <span>📉 <b style="color:{TXT}">변동성</b> &lt;20% 안정 · 20~35% 보통 · &gt;35% 고위험</span>
+  <span>⭐ <b style="color:{TXT}">샤프</b> &lt;0 손실 · 0~1 보통 · &gt;1 우수</span>
+</div>""", unsafe_allow_html=True)
+
+        st.markdown(f'<div style="height:1.5rem"></div>', unsafe_allow_html=True)
+
+        # ── 상관관계 매트릭스 ────────────────────────────────
+        st.markdown(f"""
+<div style="font-size:14px;font-weight:600;color:{SUB};
+  margin-bottom:10px;font-family:'Inter',sans-serif">상관관계 매트릭스</div>
+""", unsafe_allow_html=True)
+
+        all_tickers = [p["ticker"] for p in positions]
+        names_map   = {p["ticker"]: p["name"] for p in positions}
+        pivot = prices[prices["ticker"].isin(all_tickers)]\
+            .pivot_table(index="date", columns="ticker", values="close")
+        ret_mat = pivot.pct_change().dropna()
+
+        if len(ret_mat.columns) >= 2 and len(ret_mat) >= 10:
+            corr = ret_mat.corr()
+            corr.columns = [names_map.get(t, t) for t in corr.columns]
+            corr.index   = [names_map.get(t, t) for t in corr.index]
+
+            fig_c = go.Figure(go.Heatmap(
+                z=corr.values, x=list(corr.columns), y=list(corr.index),
+                colorscale=[[0,"#E74C3C"],[0.5,CARD],[1,"#2ECC71"]],
+                zmin=-1, zmax=1,
+                text=[[f"{v:.2f}" for v in row] for row in corr.values],
+                texttemplate="%{text}",
+                textfont={"size":11,"color":TXT,"family":"JetBrains Mono"},
+                hovertemplate="<b>%{y} × %{x}</b><br>%{z:.3f}<extra></extra>",
+                colorbar=dict(thickness=10,tickfont=dict(color=MUT,size=9),
+                              bgcolor="rgba(0,0,0,0)")
+            ))
+            fig_c.update_layout(
+                paper_bgcolor=CARD, plot_bgcolor=CARD,
+                height=max(280, len(corr)*60),
+                margin=dict(l=8,r=60,t=8,b=8),
+                font=dict(family="JetBrains Mono",size=10,color=MUT),
+                xaxis=dict(tickfont=dict(size=10,color=TXT),tickangle=-30),
+                yaxis=dict(tickfont=dict(size=10,color=TXT))
+            )
+            st.plotly_chart(fig_c, use_container_width=True)
+
+            # 최고/최저 상관 인사이트
+            arr = corr.values.copy(); np.fill_diagonal(arr, np.nan)
+            if not np.all(np.isnan(arr)):
+                hi_i = np.unravel_index(np.nanargmax(arr), arr.shape)
+                lo_i = np.unravel_index(np.nanargmin(arr), arr.shape)
+                cols_list = list(corr.columns)
+                st.markdown(f"""
+<div style="background:{C2};border:1px solid {BORD};border-radius:8px;
+  padding:10px 14px;font-size:11px;color:{SUB};margin-top:8px;display:flex;gap:16px;flex-wrap:wrap">
+  <span>🔗 <b style="color:{TXT}">최고 상관:</b> {cols_list[hi_i[0]]} × {cols_list[hi_i[1]]}
+    <span style="color:{DN};font-weight:700"> {arr[hi_i]:.2f}</span>
+    → 같은 방향으로 움직임
+  </span>
+  <span>🔀 <b style="color:{TXT}">최저 상관:</b> {cols_list[lo_i[0]]} × {cols_list[lo_i[1]]}
+    <span style="color:{UP};font-weight:700"> {arr[lo_i]:.2f}</span>
+    → 분산 효과 우수
+  </span>
+</div>""", unsafe_allow_html=True)
+
+        st.markdown(f'<div style="height:1.5rem"></div>', unsafe_allow_html=True)
+
+        # ── 롤링 변동성 추이 ─────────────────────────────────
+        st.markdown(f"""
+<div style="font-size:14px;font-weight:600;color:{SUB};
+  margin-bottom:10px;font-family:'Inter',sans-serif">롤링 변동성 추이 (30일 연환산)</div>
+""", unsafe_allow_html=True)
+
+        fig_v = go.Figure()
+        for i, pos in enumerate(positions):
+            sub = prices[prices["ticker"]==pos["ticker"]].sort_values("date").copy()
+            if len(sub) < 35: continue
+            sub["ret"] = sub["close"].pct_change()
+            sub["vol"] = sub["ret"].rolling(30).std() * np.sqrt(252) * 100
+            sub = sub.dropna(subset=["vol"])
+            if sub.empty: continue
+            fig_v.add_trace(go.Scatter(
+                x=sub["date"], y=sub["vol"], name=pos["name"],
+                line=dict(color=HOLD_COLORS[i%len(HOLD_COLORS)], width=2),
+                hovertemplate=f"<b>{pos['name']}</b> %{{y:.1f}}%<extra></extra>"))
+
+        fig_v.add_hline(y=20, line_dash="dash", line_color=GOLD, line_width=1,
+            annotation_text="20% 경계", annotation_font_color=GOLD, annotation_font_size=9)
+        fig_v.update_layout(
+            paper_bgcolor=CARD, plot_bgcolor=CARD, height=260,
+            margin=dict(l=8,r=8,t=8,b=8),
+            legend=dict(orientation="h",y=1.1,x=0,font=dict(size=10,color=SUB),bgcolor="rgba(0,0,0,0)"),
+            hovermode="x unified",
+            xaxis=dict(showgrid=False, tickfont=dict(size=9,color=MUT)),
+            yaxis=dict(showgrid=True, gridcolor=G, ticksuffix="%", tickfont=dict(size=9,color=MUT)))
+        st.plotly_chart(fig_v, use_container_width=True)
