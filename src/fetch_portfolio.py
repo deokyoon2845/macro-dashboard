@@ -1,88 +1,50 @@
-"""
-보유 종목 가격 자동 수집 — portfolio.json 읽어서 yfinance로 일일 종가 저장
-"""
-import json
+"""보유 종목 일일 가격 수집 — portfolio.json → portfolio_prices.parquet"""
+import json, time
 import yfinance as yf
 import pandas as pd
 from pathlib import Path
-from datetime import datetime
-import time
 
 ROOT = Path(__file__).parent.parent
-DATA = ROOT / "data"
-PORT_FILE = DATA / "portfolio.json"
-OUT_FILE = DATA / "portfolio_prices.parquet"
+DATA = ROOT/"data"
+PORT_FILE = DATA/"portfolio.json"
+OUT_FILE  = DATA/"portfolio_prices.parquet"
 
 def load_portfolio():
-    if not PORT_FILE.exists():
-        print("portfolio.json 없음. 수집할 종목 없음.")
-        return []
-    with open(PORT_FILE, encoding="utf-8") as f:
-        return json.load(f)
+    if not PORT_FILE.exists(): return []
+    with open(PORT_FILE, encoding="utf-8") as f: return json.load(f)
 
 def fetch_one(ticker):
-    """yfinance에서 최근 30일 종가 가져오기"""
     try:
         t = yf.Ticker(ticker)
         hist = t.history(period="30d", auto_adjust=False)
-        if hist.empty:
-            print(f"  ✗ {ticker}: 데이터 없음")
-            return []
-        currency = t.info.get("currency", "USD")
-        rows = []
-        for idx, row in hist.iterrows():
-            rows.append({
-                "ticker": ticker,
-                "date": pd.Timestamp(idx.date()),
-                "close": float(row["Close"]),
-                "volume": float(row["Volume"]) if not pd.isna(row["Volume"]) else 0,
-                "currency": currency,
-            })
-        return rows
+        if hist.empty: return []
+        currency = t.info.get("currency","USD")
+        return [{"ticker":ticker,"date":pd.Timestamp(i.date()),
+                 "close":float(r["Close"]),"currency":currency}
+                for i, r in hist.iterrows()]
     except Exception as e:
-        print(f"  ✗ {ticker}: {e}")
-        return []
+        print(f"  ✗ {ticker}: {e}"); return []
 
 def main():
     items = load_portfolio()
-    if not items:
-        return
-
-    tickers = sorted(set(item["ticker"] for item in items if item.get("ticker")))
-    print(f"수집 대상: {len(tickers)}개 티커")
-
-    # 기존 데이터 로드
+    if not items: print("portfolio.json 비어있음."); return
+    tickers = sorted(set(it["ticker"] for it in items if it.get("ticker")))
+    print(f"수집: {len(tickers)}개 티커")
+    df_old = pd.DataFrame()
     if OUT_FILE.exists():
         df_old = pd.read_parquet(OUT_FILE)
         df_old["date"] = pd.to_datetime(df_old["date"])
-    else:
-        df_old = pd.DataFrame()
-
-    all_new = []
+    all_rows = []
     for tk in tickers:
         rows = fetch_one(tk)
-        if rows:
-            all_new.extend(rows)
-            print(f"  ✓ {tk}: {len(rows)}일치, 최근가 {rows[-1]['close']:.2f} {rows[-1]['currency']}")
-        time.sleep(0.5)  # yfinance rate limit
-
-    if not all_new:
-        print("새로 수집된 데이터 없음.")
-        return
-
-    df_new = pd.DataFrame(all_new)
-
-    # 머지 (date+ticker 기준 중복 제거)
-    if not df_old.empty:
-        df = pd.concat([df_old, df_new], ignore_index=True)
-        df = df.drop_duplicates(subset=["date", "ticker"], keep="last")
-    else:
-        df = df_new
-
-    df = df.sort_values(["ticker", "date"])
+        if rows: all_rows.extend(rows); print(f"  ✓ {tk}: {len(rows)}일")
+        time.sleep(0.5)
+    if not all_rows: return
+    df_new = pd.DataFrame(all_rows)
+    df = pd.concat([df_old, df_new], ignore_index=True) if not df_old.empty else df_new
+    df = df.drop_duplicates(subset=["date","ticker"], keep="last").sort_values(["ticker","date"])
     DATA.mkdir(exist_ok=True)
     df.to_parquet(OUT_FILE, index=False)
-    print(f"저장 완료: {OUT_FILE} ({len(df)} rows)")
+    print(f"✅ 저장: {len(df)} rows")
 
-if __name__ == "__main__":
-    main()
+if __name__ == "__main__": main()
