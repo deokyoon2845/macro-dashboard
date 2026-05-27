@@ -29,30 +29,43 @@ def up_dn(d): return UP if (d or 0)>=0 else DN
 
 # ── CSS ──────────────────────────────────────────────────────
 st.markdown(f"""
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Gowun+Batang:wght@400;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
 <style>
-@font-face{{font-family:'MaruBuri';
-  src:url('https://cdn.jsdelivr.net/gh/wkdtjsgur100/maruburifonts@1.0/static/MaruBuri/MaruBuri-Regular.woff2') format('woff2');font-weight:400}}
-@font-face{{font-family:'MaruBuri';
-  src:url('https://cdn.jsdelivr.net/gh/wkdtjsgur100/maruburifonts@1.0/static/MaruBuri/MaruBuri-Bold.woff2') format('woff2');font-weight:700}}
-html,body,[class*="css"]{{background-color:{BG}!important;color:{TXT}!important;
+html,body,[class*="css"]{{
+  background-color:{BG}!important;color:{TXT}!important;
   font-family:'Inter','Gowun Batang',sans-serif!important;
-  letter-spacing:-.01em!important;line-height:1.4!important}}
-.block-container{{padding:0 2rem 3rem!important;max-width:100%!important;background:transparent!important}}
+  letter-spacing:-.015em!important
+}}
+.block-container{{padding:0 1.5rem 2rem!important;max-width:100%!important;background:transparent!important}}
 [data-testid="stAppViewContainer"]{{background-color:{BG}!important}}
-[data-testid="stHeader"]{{background:transparent!important;height:0}}
 [data-testid="stSidebar"]{{background-color:{CARD}!important;border-right:1px solid {BORD}!important}}
 #MainMenu,footer,header{{visibility:hidden}}
-p,span,div,label,th,td{{color:{TXT}!important}}
-.stButton>button{{background-color:{C2}!important;color:{TXT}!important;
-  border:1px solid {BORD}!important;border-radius:8px!important;
-  font-family:'Inter',sans-serif!important;padding:6px 16px!important;
-  font-size:12px!important;font-weight:500!important;box-shadow:none!important}}
-.stButton>button:hover{{border-color:{B5}!important;color:{B5}!important;background:{C3}!important}}
-.stButton>button:active,.stButton>button:focus{{
-  border-color:{B5}!important;color:{B5}!important;
-  background:{C2}!important;box-shadow:none!important}}
-.kpi-grid{{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;flex:1}}
+p,span,div,label{{color:{TXT}!important}}
+/* 숫자·KPI에 Mono 폰트 자동 적용 */
+[data-testid="stMetricValue"]{{font-family:'JetBrains Mono',monospace!important;font-weight:700!important}}
+/* 버튼 */
+.stButton>button{{
+  background:{C2}!important;color:{TXT}!important;
+  border:1px solid {BORD}!important;border-radius:6px!important;
+  font-family:'Inter',sans-serif!important;font-size:12px!important;
+  font-weight:500!important;transition:all .15s!important}}
+.stButton>button:hover{{
+  border-color:{B5}!important;color:{B5}!important;background:{C3}!important}}
+/* 탭 */
+.stTabs [data-baseweb="tab-list"]{{
+  background:{CARD}!important;border-bottom:1px solid {BORD}!important;gap:0;padding:0}}
+.stTabs [data-baseweb="tab"]{{
+  background:transparent!important;color:{SUB}!important;
+  font-family:'Inter',sans-serif!important;font-size:12px!important;font-weight:500!important;
+  border-bottom:2px solid transparent!important;padding:10px 18px!important}}
+.stTabs [aria-selected="true"]{{color:{TXT}!important;border-bottom-color:{B5}!important}}
+.stTabs [data-baseweb="tab-panel"]{{background:transparent!important;padding:0!important}}
+/* 스크롤바 */
+::-webkit-scrollbar{{width:4px;height:4px}}
+::-webkit-scrollbar-track{{background:{BG}}}
+::-webkit-scrollbar-thumb{{background:{BORD};border-radius:2px}}
+/* select/input */
+[data-baseweb="select"]>div{{background:{C2}!important;border-color:{BORD}!important}}
 </style>
 """, unsafe_allow_html=True)
 
