@@ -44,7 +44,11 @@ tab1, tab2, tab3 = st.tabs(["📋 DART 공시", "📊 거래량 이상", "🔍 �
 
 # ── DART 공시 ─────────────────────────────────────────────────
 with tab1:
-    DART_API = st.secrets.get("DART_API_KEY","") if hasattr(st,"secrets") else ""
+    def get_secret(k, default=""):
+    try: return st.secrets[k]
+    except: return os.environ.get(k, default)
+
+DART_KEY = get_secret("DART_API_KEY")
 
     st.markdown(f"""
 <div style="background:{C2};border:1px solid {BORD};border-radius:8px;padding:12px;margin-bottom:1rem;font-size:10px;color:{MUT}">
