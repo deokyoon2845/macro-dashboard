@@ -77,6 +77,19 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python src/review_journal.py
 
+
+      - name: Generate weekly report (월요일만)
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ "$(date +%u)" = "1" ]; then
+            echo "📊 월요일 — 주간 리포트 생성"
+            python src/weekly_report.py
+          else
+            echo "⏭ 월요일이 아니므로 건너뜀 (오늘: $(date +%A))"
+          fi
+      
       - name: Generate daily briefing
         continue-on-error: true
         env:
