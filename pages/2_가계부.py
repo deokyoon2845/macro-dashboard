@@ -10,10 +10,8 @@ from datetime import datetime
 st.set_page_config(page_title="가계부", page_icon="💰", layout="wide",
                    initial_sidebar_state="expanded")
 
-BG="#F5F0E5"; CARD="#FFFFFF"; C2="#FAF6EC"; BORD="#E5DDD0"
-TXT="#2A2620"; SUB="#5A5246"; MUT="#8C7F6E"
-B5="#2563EB"; B6="#1D4ED8"; PUR_HI="#BAE6FD"
-GREEN="#059669"; RED="#DC2626"
+BG="#0A0D13"; CARD="#111620"; C2="#161C28"; C3="#1C2438"; BORD="#222A3A"; G="#181F2C"
+TXT="#E4EAF6"; SUB="#7A8CA4"; MUT="#4A5668"; ACC="#4A82E4"; UP="#2ECC71"; DN="#E74C3C"
 
 st.markdown(f"""
 <style>
