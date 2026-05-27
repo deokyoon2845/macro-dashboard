@@ -68,15 +68,18 @@ def build_portfolio():
         cur=float(sub.iloc[-1]["close"]); prev=float(sub.iloc[-2]["close"]) if len(sub)>=2 else cur
         fxv=fx if it.get("currency")=="USD" else 1
         positions.append({"name":it["name"],"value":cur*qty*fxv,
-                          "pnl_krw":(cur-avg)*qty*fxv,"daily_pct":(cur/prev-1)*100 if prev>0 else 0})
+                          "pnl_krw":(cur-avg)*qty*fxv,
+                          "daily_pct":(cur/prev-1)*100 if prev>0 else 0})
     if not positions: return "(가격 데이터 없음)"
     tv=sum(p["value"] for p in positions); tp=sum(p["pnl_krw"] for p in positions)
     tpct=tp/(tv-tp)*100 if (tv-tp)>0 else 0
     up=sorted(positions,key=lambda x:x["daily_pct"],reverse=True)[:3]
     dn=sorted(positions,key=lambda x:x["daily_pct"])[:3]
+    # ▼ 백슬래시 f-string 대신 변수로 분리 (Python 3.11 호환)
+    up_str=", ".join(f"{p['name']}({p['daily_pct']:+.2f}%)" for p in up if p['daily_pct']>0)
+    dn_str=", ".join(f"{p['name']}({p['daily_pct']:+.2f}%)" for p in dn if p['daily_pct']<0)
     return (f"  총평가: {tv:,.0f}원\n  누적손익: {tp:+,.0f}원 ({tpct:+.2f}%)\n"
-            f"  상승: {', '.join(f'{p[\"name\"]}({p[\"daily_pct\"]:+.2f}%)' for p in up if p['daily_pct']>0)}\n"
-            f"  하락: {', '.join(f'{p[\"name\"]}({p[\"daily_pct\"]:+.2f}%)' for p in dn if p['daily_pct']<0)}")
+            f"  상승: {up_str}\n  하락: {dn_str}")
 
 def build_news():
     news=load_json("portfolio_news.json",{})
