@@ -14,11 +14,8 @@ st.set_page_config(page_title="DY Monitoring",
                    initial_sidebar_state="collapsed")
 
 # ── 팔레트 ──────────────────────────────────────────────────
-BG="#0D1117"; CARD="#161B22"; C2="#1C2128"; BORD="#30363D"; G="#21262D"
-TXT="#E6EDF3"; SUB="#8D96A0"; MUT="#6E7681"
-PUR_HI="#1F6FEB"; PUR_DK="#58A6FF"
-B1="#CAE8FF"; B3="#79C0FF"; B4="#58A6FF"; B5="#388BFD"; B6="#2F81F7"; B7="#1F6FEB"; B8="#1158C7"
-UP="#3FB950"; DN="#F85149"
+BG="#0A0D13"; CARD="#111620"; C2="#161C28"; C3="#1C2438"; BORD="#222A3A"; G="#181F2C"
+TXT="#E4EAF6"; SUB="#7A8CA4"; MUT="#4A5668"; ACC="#4A82E4"; UP="#2ECC71"; DN="#E74C3C"
 
 def up_dn(d): return UP if (d or 0)>=0 else DN
 
