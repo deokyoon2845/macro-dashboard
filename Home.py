@@ -95,6 +95,59 @@ if brief:
   </div>
 </div>""", unsafe_allow_html=True)
 
+# ── 주간 리포트 ──────────────────────────────────────────────
+WEEKLY_FILE = DATA_DIR / "weekly_report.json"
+weekly = None
+if WEEKLY_FILE.exists():
+    with open(WEEKLY_FILE, encoding="utf-8") as f:
+        weekly = json.load(f)
+
+if weekly:
+    grade_map = {
+        "S": (UP,  "rgba(46,204,113,.18)"),
+        "A": (B5,  "rgba(74,130,228,.18)"),
+        "B": (GOLD,"rgba(245,166,35,.18)"),
+        "C": (SUB, C2),
+        "D": (DN,  "rgba(231,76,60,.18)"),
+    }
+    grade = weekly.get("grade","B")
+    gc, gbg = grade_map.get(grade, (SUB, C2))
+    try:
+        gen_t = datetime.fromisoformat(weekly.get("generated_at","")).strftime("%m-%d 생성")
+    except: gen_t = ""
+
+    with st.expander(f"📊 주간 리포트 — {weekly.get('week_range','')}  등급: {grade}", expanded=False):
+        st.markdown(f"""
+<div style="background:{CARD};border:1px solid {BORD};border-left:4px solid {gc};
+  border-radius:10px;padding:16px 20px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div style="font-size:18px;font-weight:700;color:{TXT}">{weekly.get('headline','')}</div>
+    <span style="background:{gbg};color:{gc};padding:4px 14px;border-radius:20px;
+      font-size:14px;font-weight:800;font-family:'JetBrains Mono',monospace">{grade}</span>
+  </div>
+  <div style="font-size:12px;color:{TXT};line-height:1.7;margin-bottom:4px">
+    <b style="color:{SUB}">📈 성과 ·</b> {weekly.get('performance','')}
+  </div>
+  <div style="font-size:12px;color:{TXT};line-height:1.7;margin-bottom:4px">
+    <b style="color:{SUB}">🌍 시장 ·</b> {weekly.get('market_context','')}
+  </div>
+  <div style="font-size:12px;color:{UP};line-height:1.7;margin-bottom:4px">
+    <b>✅ 잘된 점 ·</b> {weekly.get('best','')}
+  </div>
+  <div style="font-size:12px;color:{DN};line-height:1.7;margin-bottom:10px">
+    <b>⚠️ 아쉬운 점 ·</b> {weekly.get('worst','')}
+  </div>
+  <div style="background:{C2};border-radius:6px;padding:10px 14px;font-size:11px;color:{gc}">
+    💡 {weekly.get('lessons','')}
+  </div>
+  <div style="font-size:11px;color:{SUB};margin-top:10px">
+    👀 다음 주: {weekly.get('next_week','')}
+  </div>
+  <div style="font-size:9px;color:{MUT};margin-top:8px;font-family:'JetBrains Mono',monospace">
+    {gen_t}
+  </div>
+</div>""", unsafe_allow_html=True)
+
 # ── KPI ──────────────────────────────────────────────────────
 st.markdown(f'<div style="height:1px;background:{BORD};margin:.5rem 0 1.2rem"></div>',unsafe_allow_html=True)
 KPI_ITEMS=[("S&P500","SPX",market,",.0f"),("NASDAQ","NASDAQ",market,",.0f"),
