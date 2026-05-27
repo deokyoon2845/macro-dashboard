@@ -8,6 +8,14 @@ from datetime import datetime, date
 st.set_page_config(page_title="스터디",page_icon="📚",layout="wide",
                    initial_sidebar_state="expanded")
 
+# ── 홈 버튼 ─────────────────────────────────────────────────
+with st.sidebar:
+    st.page_link("Home.py", label="🏠  홈으로 돌아가기", use_container_width=True)
+    st.markdown(
+        f'<div style="height:1px;background:#222A3A;margin:6px 0"></div>',
+        unsafe_allow_html=True
+    )
+
 # ── 다크 팔레트 (전 페이지 공통) ───────────────────────────
 BG    = "#0A0D13"; CARD  = "#111620"; C2    = "#161C28"
 C3    = "#1C2438"; BORD  = "#222A3A"; G     = "#181F2C"
