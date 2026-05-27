@@ -868,4 +868,144 @@ with col_ecos:
                 dc=(f'<div style="font-size:9px;color:{MUT};margin-top:1px">{dt}</div>'
                     if dt else "")
                 rows+=(f'<tr style="border-bottom:1px solid {BORD}">'
-                       f'<td style="padding:.35rem .7rem;
+                       f'<td style="padding:.35rem .7rem;font-size:9px;color:{MUT}">'
+                       f'{r.get("CLASS_NAME","")}</td>'
+                       f'<td style="padding:.35rem .7rem">'
+                       f'<div style="font-size:11px;color:{TXT}">{kn}</div>{dc}</td>'
+                       f'<td style="padding:.35rem .7rem;font-size:12px;font-weight:700;'
+                       f'text-align:right;font-family:JetBrains Mono;color:{TXT}">'
+                       f'{r.get("DATA_VALUE","")}</td>'
+                       f'<td style="padding:.35rem .7rem;font-size:9px;color:{MUT};'
+                       f'text-align:right">{r.get("UNIT_NAME","")}</td></tr>')
+            TH=(f"padding:.45rem .7rem;text-align:left;font-size:9px;color:{MUT};"
+                f"font-weight:500;border-bottom:1px solid {BORD}")
+            st.markdown(f"""
+<div style="background:{CARD};border:1px solid {BORD};border-radius:10px;overflow:hidden">
+<table style="width:100%;border-collapse:collapse">
+  <thead><tr style="background:{C2}">
+    <th style="{TH}">분류</th><th style="{TH}">지표</th>
+    <th style="{TH};text-align:right">현재값</th>
+    <th style="{TH};text-align:right">단위</th>
+  </tr></thead><tbody>{rows}</tbody>
+</table></div>""",unsafe_allow_html=True)
+    else:
+        no_data("ECOS 데이터")
+
+with col_cal:
+    st.markdown(
+        f'<div style="font-size:14px;font-weight:600;color:{SUB};margin-bottom:4px">'
+        f'경제 캘린더</div>',unsafe_allow_html=True)
+    nav1,nav2,nav3 = st.columns([1,3,1])
+    with nav1:
+        if st.button("◀ 이전달",key="cal_prev"):
+            if st.session_state.cal_month==1:
+                st.session_state.cal_month=12; st.session_state.cal_year-=1
+            else: st.session_state.cal_month-=1
+            st.rerun()
+    with nav2:
+        mo=["1월","2월","3월","4월","5월","6월",
+            "7월","8월","9월","10월","11월","12월"]
+        st.markdown(
+            f'<div style="text-align:center;font-size:15px;font-weight:700;'
+            f'color:{TXT};padding:6px 0">'
+            f'{st.session_state.cal_year}년 {mo[st.session_state.cal_month-1]}</div>',
+            unsafe_allow_html=True)
+    with nav3:
+        if st.button("다음달 ▶",key="cal_next"):
+            if st.session_state.cal_month==12:
+                st.session_state.cal_month=1; st.session_state.cal_year+=1
+            else: st.session_state.cal_month+=1
+            st.rerun()
+
+    CAL_EVENTS={
+        date(2026,5,29):[("bok","한국 금통위")],
+        date(2026,6,5): [("econ","美 NFP (5월)")],
+        date(2026,6,9): [("fomc","FOMC 금리결정")],
+        date(2026,6,11):[("econ","美 CPI (5월)")],
+        date(2026,6,28):[("bok","한국 금통위")],
+        date(2026,7,2): [("econ","美 NFP (6월)")],
+        date(2026,7,10):[("bok","한국 금통위")],
+        date(2026,7,15):[("econ","美 CPI (6월)")],
+        date(2026,7,22):[("earn","META 실적")],
+        date(2026,7,23):[("earn","GOOGL 실적")],
+        date(2026,7,28):[("fomc","FOMC 금리결정"),("earn","MSFT 실적")],
+        date(2026,7,29):[("earn","AAPL 실적")],
+        date(2026,8,1): [("earn","AMZN 실적")],
+        date(2026,8,7): [("econ","美 NFP (7월)")],
+        date(2026,8,12):[("econ","美 CPI (7월)")],
+        date(2026,8,27):[("earn","NVDA 실적"),("bok","한국 금통위")],
+        date(2026,9,15):[("fomc","FOMC 금리결정")],
+        date(2026,10,16):[("bok","한국 금통위")],
+        date(2026,10,27):[("fomc","FOMC 금리결정")],
+        date(2026,11,27):[("bok","한국 금통위")],
+        date(2026,12,8): [("fomc","FOMC 금리결정")],
+    }
+    TC={
+        "fomc":(B5,"rgba(47,129,247,.2)"),
+        "bok": (PUR_DK,"rgba(88,166,255,.2)"),
+        "econ":(UP,"rgba(63,185,80,.2)"),
+        "earn":(GOLD,"rgba(245,166,35,.2)"),
+    }
+
+    def build_calendar(year,month,events):
+        cal_lib.setfirstweekday(0)
+        weeks=cal_lib.monthcalendar(year,month); today=date.today()
+        day_hd=""
+        for dn_,dc2 in [("월",TXT),("화",TXT),("수",TXT),("목",TXT),
+                         ("금",TXT),("토",B4),("일",DN)]:
+            day_hd+=(f'<div style="text-align:center;font-size:10px;font-weight:600;'
+                     f'color:{dc2};padding:5px 0">{dn_}</div>')
+        cells=""
+        for wk in weeks:
+            for day_num in wk:
+                if day_num==0:
+                    cells+=(f'<div style="background:{BG};border-radius:6px;'
+                             f'min-height:72px"></div>')
+                else:
+                    d=date(year,month,day_num)
+                    is_today=(d==today); is_past=(d<today)
+                    evs=events.get(d,[])
+                    ev_html=""
+                    for ev_type,ev_name in evs[:2]:
+                        ec,eb=TC.get(ev_type,(MUT,C2))
+                        ev_short=ev_name[:10]+("…" if len(ev_name)>10 else "")
+                        ev_html+=(f'<div style="background:{eb};color:{ec};'
+                                   f'border-radius:3px;font-size:8px;padding:1px 4px;'
+                                   f'margin-top:2px;overflow:hidden;white-space:nowrap;'
+                                   f'font-family:JetBrains Mono,monospace">{ev_short}</div>')
+                    if len(evs)>2:
+                        ev_html+=f'<div style="font-size:8px;color:{MUT}">+{len(evs)-2}</div>'
+                    if is_today:   bg_d=B5; brd=f"2px solid {B5}"; day_c="#FFFFFF"
+                    elif is_past:  bg_d=BG; brd=f"1px solid {BORD}"; day_c=MUT
+                    else:          bg_d=CARD; brd=f"1px solid {BORD}"; day_c=TXT
+                    cells+=(f'<div style="background:{bg_d};border:{brd};'
+                             f'border-radius:6px;padding:5px;min-height:72px;overflow:hidden">'
+                             f'<div style="font-size:12px;font-weight:'
+                             f'{"700" if is_today else "400"};color:{day_c}">{day_num}</div>'
+                             f'{ev_html}</div>')
+        legend=""
+        for lbl,et in [("FOMC","fomc"),("금통위","bok"),("경제지표","econ"),("실적","earn")]:
+            ec,eb=TC[et]
+            legend+=(f'<span style="background:{eb};color:{ec};border-radius:3px;'
+                     f'font-size:9px;padding:2px 7px;margin-right:6px;'
+                     f'font-family:JetBrains Mono,monospace">{lbl}</span>')
+        return (f'<div style="background:{CARD};border:1px solid {BORD};'
+                f'border-radius:10px;padding:12px">'
+                f'<div style="display:grid;grid-template-columns:repeat(7,1fr);'
+                f'gap:3px;margin-bottom:3px">{day_hd}</div>'
+                f'<div style="display:grid;grid-template-columns:repeat(7,1fr);'
+                f'gap:3px">{cells}</div>'
+                f'<div style="margin-top:10px;padding-top:8px;'
+                f'border-top:1px solid {BORD}">{legend}</div></div>')
+
+    st.markdown(build_calendar(st.session_state.cal_year,
+                               st.session_state.cal_month,CAL_EVENTS),
+                unsafe_allow_html=True)
+
+# ── 푸터 ─────────────────────────────────────────────────────
+st.markdown(f"""
+<div style="margin-top:3rem;padding-top:1rem;border-top:1px solid {BORD};
+  font-size:10px;color:{MUT};text-align:center">
+  FRED · yfinance · CNN Fear&amp;Greed · 한국은행 ECOS · 매일 KST 07:00 자동수집 · 전일 종가 기준
+</div>
+""", unsafe_allow_html=True)
