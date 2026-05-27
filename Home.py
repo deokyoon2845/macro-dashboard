@@ -1,78 +1,62 @@
-"""
-Deokyoon's Monitoring — Home
-"""
+"""Deokyoon's Monitoring — Home (일일 AI 브리핑 포함)"""
 import streamlit as st
 import pandas as pd
+import json
 from pathlib import Path
 from datetime import datetime
-import sys, base64
 
 st.set_page_config(page_title="Deokyoon's Monitoring", page_icon="◈",
                    layout="wide", initial_sidebar_state="expanded")
 
-# ── 색상 팔레트 (중복 정의 — pages와 독립적) ─────────────────
-BG="#F5F0E5"; CARD="#FFFFFF"; C2="#FAF6EC"
-BORD="#E5DDD0"; TXT="#2A2620"; SUB="#5A5246"; MUT="#8C7F6E"
-PUR_HI="#BAE6FD"; PUR_DK="#0369A1"
-B3="#60A5FA"; B4="#3B82F6"; B5="#2563EB"; B6="#1D4ED8"; B8="#1E3A8A"
-UP=B5; DN=B8
+BG="#0D1117"; CARD="#161B22"; C2="#1C2128"; BORD="#30363D"
+TXT="#E6EDF3"; SUB="#8D96A0"; MUT="#6E7681"
+B5="#388BFD"; B6="#2F81F7"; B7="#1F6FEB"; B8="#1158C7"
+UP="#3FB950"; DN="#F85149"
 
 st.markdown(f"""
-<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-@font-face{{font-family:'MaruBuri';src:url('https://cdn.jsdelivr.net/gh/wkdtjsgur100/maruburifonts@1.0/static/MaruBuri/MaruBuri-Regular.woff2') format('woff2')}}
-html,body,[class*="css"]{{background-color:{BG}!important;
-  background-image:radial-gradient(rgba(139,119,98,.042) 1px,transparent 1px),radial-gradient(rgba(139,119,98,.022) 1px,transparent 1px)!important;
-  background-size:32px 32px,16px 16px!important;background-position:0 0,8px 8px!important;
-  color:{TXT}!important;font-family:'MaruBuri','Gowun Batang',serif!important;
-  letter-spacing:.015em!important;line-height:1.3!important}}
+html,body,[class*="css"]{{background-color:{BG}!important;color:{TXT}!important;
+  font-family:'MaruBuri','Gowun Batang',serif!important;letter-spacing:.015em!important}}
 .block-container{{padding:1.5rem 2rem 3rem!important;max-width:100%!important;background:transparent!important}}
-[data-testid="stAppViewContainer"]{{background-color:{BG}!important;
-  background-image:radial-gradient(rgba(139,119,98,.042) 1px,transparent 1px),radial-gradient(rgba(139,119,98,.022) 1px,transparent 1px)!important;
-  background-size:32px 32px,16px 16px!important;background-position:0 0,8px 8px!important}}
+[data-testid="stAppViewContainer"]{{background-color:{BG}!important}}
+[data-testid="stSidebar"]{{background-color:{CARD}!important;border-right:1px solid {BORD}!important}}
 #MainMenu,footer,header{{visibility:hidden}}
 p,span,div,label{{color:{TXT}!important}}
-/* 사이드바 커스텀 */
-[data-testid="stSidebar"]{{background-color:{CARD}!important;border-right:1px solid {BORD}!important}}
-[data-testid="stSidebarNavItems"] a{{font-family:'MaruBuri',serif!important;font-size:14px!important;color:{TXT}!important}}
-[data-testid="stSidebarNavItems"] a:hover{{color:{B5}!important}}
 </style>
 """, unsafe_allow_html=True)
 
-# ── 데이터 로드 ──────────────────────────────────────────────
-DATA_DIR = Path(__file__).parent / "data"
+DATA_DIR = Path(__file__).parent/"data"
 
-@st.cache_data(ttl=3600)
-def load(fn):
-    f = DATA_DIR / fn
-    if not f.exists(): return pd.DataFrame()
-    df = pd.read_parquet(f)
-    if "date" in df.columns: df["date"] = pd.to_datetime(df["date"])
+@st.cache_data(ttl=600)
+def load_pq(fn):
+    p=DATA_DIR/fn
+    if not p.exists(): return pd.DataFrame()
+    df=pd.read_parquet(p)
+    if "date" in df.columns: df["date"]=pd.to_datetime(df["date"])
     return df
 
-market = load("market_prices.parquet")
-fred   = load("fred_indicators.parquet")
-sentiment = load("sentiment.parquet")
+market=load_pq("market_prices.parquet"); fred=load_pq("fred_indicators.parquet")
 
-def lat(df, ind):
-    if df.empty: return None
-    s = df[df["indicator"]==ind].sort_values("date")
+def latest(df,ind):
+    if df.empty or "indicator" not in df.columns: return None
+    s=df[df["indicator"]==ind].sort_values("date")
     return s.iloc[-1] if not s.empty else None
 
-def dlt(df, ind):
-    if df.empty: return None
-    s = df[df["indicator"]==ind].sort_values("date").tail(10)
+def dlt(df,ind):
+    if df.empty or "indicator" not in df.columns: return None
+    s=df[df["indicator"]==ind].sort_values("date").tail(2)
     return (s.iloc[-1]["value"]-s.iloc[-2]["value"]) if len(s)>=2 else None
 
-now = datetime.now()
+# ── 일일 AI 브리핑 ────────────────────────────────────────────
+BRIEF_FILE = DATA_DIR/"daily_briefing.json"
+brief = None
+if BRIEF_FILE.exists():
+    with open(BRIEF_FILE, encoding="utf-8") as f:
+        brief = json.load(f)
 
-# ── 헤더 ─────────────────────────────────────────────────────
-col_logo, col_info = st.columns([2,1])
-with col_logo:
-    st.markdown(f"""
-<div style="font-family:'MaruBuri',serif;font-size:36px;font-weight:700;color:{TXT};
-  font-style:italic;margin-bottom:6px">
-  <span style="background:linear-gradient(180deg,transparent 50%,{PUR_HI} 50%);padding:0 8px">
+st.markdown(f"""
+<div style="font-family:'MaruBuri',serif;font-size:32px;font-weight:700;font-style:italic;margin-bottom:4px">
+  <span style="background:rgba(47,129,247,.28);padding:2px 10px;border-radius:6px">
     Deokyoon's Monitoring
   </span>
 </div>
@@ -81,78 +65,74 @@ with col_logo:
 </div>
 """, unsafe_allow_html=True)
 
-with col_info:
-    v = lat(market,"VIX"); h = lat(fred,"HY_OAS")
-    if v is not None and h is not None:
-        vv,hv = v["value"],h["value"]
-        if vv>28 or hv>5.5:   rt,rc_bg,rc_t = "RISK-OFF","#FEF2F2",B6
-        elif vv<16 and hv<3.5: rt,rc_bg,rc_t = "RISK-ON","#EFF6FF",B4
-        else:                   rt,rc_bg,rc_t = "NEUTRAL","#FAFAF0",SUB
-        st.markdown(f"""
-<div style="text-align:right;margin-top:8px">
-  <span style="background:{rc_bg};color:{rc_t};border:1px solid {rc_t}40;
-    padding:5px 16px;border-radius:16px;font-size:11px;font-weight:600;
-    font-family:'JetBrains Mono',monospace">● {rt}</span>
-  <div style="font-size:10px;color:{MUT};margin-top:6px">
-    VIX {vv:.1f} · HY {hv:.2f}%<br>{now.strftime("%Y-%m-%d %H:%M")} KST
+if brief:
+    mood_map={"positive":(B5,"rgba(56,139,253,.15)"),"neutral":(SUB,C2),"cautious":(B8,"rgba(17,88,199,.15)")}
+    mc,mbg=mood_map.get(brief.get("mood","neutral"),(SUB,C2))
+    try: gen_t=datetime.fromisoformat(brief.get("generated_at","")).strftime("%m-%d %H:%M")
+    except: gen_t=""
+    st.markdown(f"""
+<div style="background:{CARD};border:1px solid {BORD};border-left:4px solid {mc};
+  border-radius:10px;padding:18px 22px;margin-bottom:1.5rem">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div>
+      <span style="font-size:10px;color:{MUT};text-transform:uppercase;letter-spacing:.1em;font-family:'JetBrains Mono',monospace">오늘의 브리핑</span>
+      <span style="background:{mbg};color:{mc};padding:2px 10px;border-radius:10px;font-size:9px;font-weight:600;margin-left:8px;font-family:'JetBrains Mono',monospace">{brief.get('mood','').upper()}</span>
+    </div>
+    <span style="font-size:9px;color:{MUT};font-family:'JetBrains Mono',monospace">{gen_t} 생성</span>
+  </div>
+  <div style="font-size:20px;font-weight:700;color:{TXT};margin-bottom:12px">{brief.get('headline','')}</div>
+  <div style="font-size:12px;color:{TXT};line-height:1.7;margin-bottom:4px"><b style="color:{SUB}">📊 시장 ·</b> {brief.get('market','')}</div>
+  <div style="font-size:12px;color:{TXT};line-height:1.7;margin-bottom:4px"><b style="color:{SUB}">💼 포트폴리오 ·</b> {brief.get('portfolio','')}</div>
+  <div style="font-size:12px;color:{TXT};line-height:1.7;margin-bottom:12px"><b style="color:{SUB}">👀 주의 ·</b> {brief.get('watch','')}</div>
+  <div style="background:{C2};border-radius:6px;padding:10px 14px;font-size:12px;color:{mc};font-weight:600">
+    💬 {brief.get('comment','')}
   </div>
 </div>""", unsafe_allow_html=True)
 
-# ── 빠른 KPI ─────────────────────────────────────────────────
-st.markdown(f'<div style="height:1px;background:{BORD};margin:.5rem 0 1.2rem"></div>', unsafe_allow_html=True)
-kpi_items = [
-    ("S&P500","SPX",market,",.0f"),("NASDAQ","NASDAQ",market,",.0f"),
-    ("KOSPI","KOSPI",market,",.0f"),("KOSDAQ","KOSDAQ",market,",.0f"),
-    ("VIX","VIX",market,".1f"),("USD/KRW","USDKRW",market,",.0f"),
-    ("미국10Y","US_10Y",fred,".2f"),
-]
-cols = st.columns(7)
-for col,(lbl,ind,df,fmt) in zip(cols,kpi_items):
-    r=lat(df,ind); d=dlt(df,ind)
+# ── KPI ──────────────────────────────────────────────────────
+st.markdown(f'<div style="height:1px;background:{BORD};margin:.5rem 0 1.2rem"></div>',unsafe_allow_html=True)
+KPI_ITEMS=[("S&P500","SPX",market,",.0f"),("NASDAQ","NASDAQ",market,",.0f"),
+           ("KOSPI","KOSPI",market,",.0f"),("KOSDAQ","KOSDAQ",market,",.0f"),
+           ("VIX","VIX",market,".1f"),("USD/KRW","USDKRW",market,",.0f"),("미국10Y","US_10Y",fred,".2f")]
+cols=st.columns(7)
+for col,(lbl,ind,df_,fmt) in zip(cols,KPI_ITEMS):
+    r=latest(df_,ind); d=dlt(df_,ind)
     with col:
         if r is not None:
-            clr = UP if (d or 0)>=0 else DN
-            sign="▲" if (d or 0)>=0 else "▼"
-            delta_str=f"{sign}{abs(d):.2f}" if d else "—"
+            clr=UP if (d or 0)>=0 else DN
             st.markdown(f"""
 <div style="background:{CARD};border:1px solid {BORD};border-left:3px solid {clr};
-  border-radius:8px;padding:10px 12px;text-align:left">
-  <div style="font-size:9px;color:{MUT};text-transform:uppercase;letter-spacing:.05em">{lbl}</div>
-  <div style="font-size:18px;font-weight:700;color:{TXT};line-height:1.1;margin:3px 0">{format(r['value'],fmt)}</div>
-  <div style="font-size:9px;color:{clr};font-weight:600">{delta_str} <span style="color:{MUT};font-weight:400">전일</span></div>
-</div>""", unsafe_allow_html=True)
+  border-radius:8px;padding:10px 12px">
+  <div style="font-size:9px;color:{MUT};text-transform:uppercase">{lbl}</div>
+  <div style="font-size:18px;font-weight:700;color:{TXT};margin:3px 0;font-family:'JetBrains Mono',monospace">{format(r['value'],fmt)}</div>
+  <div style="font-size:9px;color:{clr};font-weight:600">{'▲' if (d or 0)>=0 else '▼'}{abs(d):.2f}</div>
+</div>""",unsafe_allow_html=True)
 
-st.markdown(f'<div style="height:1px;background:{BORD};margin:1.2rem 0 1.5rem"></div>', unsafe_allow_html=True)
-
-# ── 페이지 네비게이션 카드 ────────────────────────────────────
-st.markdown(f'<div style="font-size:16px;font-weight:700;color:{TXT};margin-bottom:1rem">빠른 이동</div>', unsafe_allow_html=True)
-
-pages_info = [
-    ("pages/1_모니터링.py","📊 모니터링","한미 매크로 지표 · 환율 · 금리 · 증시 · 원자재",B5),
-    ("pages/2_가계부.py",  "💰 가계부",  "수입·지출 추적 · 카테고리별 분석 · 저축률",    "#059669"),
-    ("pages/3_투자자산.py","📈 투자자산","보유 종목 평가손익 · 자산 배분 · 수익률 비교",   "#D97706"),
-    ("pages/4_스터디.py",  "📚 스터디",  "리포트 저장 · 태그 · 투자 아이디어 메모",       PUR_DK),
-    ("pages/5_이슈.py",    "🔥 이슈",    "DART 공시 · 거래량 폭증 · 뉴스 · 구글 트렌드",  "#DC2626"),
+# ── 네비게이션 카드 ─────────────────────────────────────────
+st.markdown(f'<div style="height:1px;background:{BORD};margin:1.2rem 0 1.5rem"></div>',unsafe_allow_html=True)
+pages_info=[
+    ("pages/1_모니터링.py","📊 모니터링","매크로 지표 · 금리 · 환율 · 증시 · 원자재",B5),
+    ("pages/2_가계부.py","💰 가계부","수입·지출 추적 · 카테고리 분석 · 저축률","#059669"),
+    ("pages/3_투자자산.py","📈 투자자산","평가손익 · 뉴스 · DART 공시 · 수익률 추이","#D97706"),
+    ("pages/4_스터디.py","📚 스터디","거래 일지 · AI 회고 · 학습 노트","#58A6FF"),
+    ("pages/5_이슈.py","🔥 이슈","DART 공시 · 구글 트렌드 · 거래량 이상","#F85149"),
 ]
-
-nav_cols = st.columns(5)
+nav_cols=st.columns(5)
 for col,(path,label,desc,clr) in zip(nav_cols,pages_info):
     with col:
         st.markdown(f"""
 <div style="background:{CARD};border:1px solid {BORD};border-top:3px solid {clr};
-  border-radius:10px;padding:16px;height:120px;display:flex;flex-direction:column;justify-content:space-between">
+  border-radius:10px;padding:14px;height:110px;display:flex;flex-direction:column;justify-content:space-between;margin-bottom:8px">
   <div>
-    <div style="font-size:16px;font-weight:700;color:{TXT};margin-bottom:6px">{label}</div>
+    <div style="font-size:16px;font-weight:700;color:{TXT};margin-bottom:4px">{label}</div>
     <div style="font-size:10px;color:{MUT};line-height:1.4">{desc}</div>
   </div>
-</div>""", unsafe_allow_html=True)
-        st.page_link(path, label=f"바로가기 →", use_container_width=True)
+</div>""",unsafe_allow_html=True)
+        st.page_link(path,label="바로가기 →",use_container_width=True)
 
-# ── 마지막 업데이트 정보 ──────────────────────────────────────
 st.markdown(f"""
-<div style="margin-top:2rem;padding:12px 16px;background:{C2};border:1px solid {BORD};
+<div style="margin-top:2rem;padding:10px 14px;background:{C2};border:1px solid {BORD};
   border-radius:8px;font-size:10px;color:{MUT};font-family:'JetBrains Mono',monospace">
-  📅 마지막 데이터 수집: 매일 KST 07:00 자동 (GitHub Actions)<br>
-  📦 데이터 소스: FRED · yfinance · CNN Fear&Greed · 한국은행 ECOS
+  📅 매일 KST 07:00 자동수집 · FRED · yfinance · CNN F&G · ECOS · 네이버 뉴스 · DART
 </div>
-""", unsafe_allow_html=True)
+""",unsafe_allow_html=True)
