@@ -61,7 +61,6 @@ html,body,[class*="css"]{{background-color:{BG}!important;color:{TXT}!important;
 .stButton>button{{background:{CARD}!important;color:{TXT}!important;border:1px solid {BORD}!important;border-radius:8px!important}}
 </style>
 """, unsafe_allow_html=True)
-""", unsafe_allow_html=True)
 
 # ── 사이드바 플로팅 열기 버튼 ──────────────────────────────
 st.markdown(f"""
