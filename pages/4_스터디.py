@@ -60,7 +60,6 @@ p,span,div,label{{color:{TXT}!important}}
 
 </style>""",unsafe_allow_html=True)
 
-""", unsafe_allow_html=True)
 
 # ── 사이드바 플로팅 열기 버튼 ──────────────────────────────
 st.markdown(f"""
