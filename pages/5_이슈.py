@@ -39,7 +39,66 @@ p,span,div,label{{color:{TXT}!important}}
   font-size:12px!important;padding:10px 18px!important;
   border-bottom:2px solid transparent!important}}
 .stTabs [aria-selected="true"]{{color:{TXT}!important;border-bottom-color:{B5}!important}}
+
+/* ── 사이드바 접힘 토글 버튼 강조 ────────────────────────── */
+[data-testid="collapsedControl"] {{
+  background:{CARD} !important;
+  border:2px solid {B5} !important;
+  border-left:none !important;
+  border-radius:0 10px 10px 0 !important;
+  width:2.4rem !important;
+  top:0.8rem !important;
+  box-shadow:4px 0 14px rgba(56,139,253,.35) !important;
+  transition:all .2s !important;
+}}
+[data-testid="collapsedControl"]:hover {{
+  background:{C2} !important;
+  box-shadow:4px 0 20px rgba(56,139,253,.5) !important;
+}}
+[data-testid="collapsedControl"] svg {{
+  color:{B5} !important;
+  fill:{B5} !important;
+}}
+
 </style>""", unsafe_allow_html=True)
+
+""", unsafe_allow_html=True)
+
+# ── 사이드바 플로팅 열기 버튼 ──────────────────────────────
+st.markdown(f"""
+<div id="sb-open-btn"
+  style="position:fixed;top:10px;left:8px;z-index:99999;
+    background:{CARD};border:2px solid {B5};border-radius:10px;
+    padding:8px 12px;cursor:pointer;
+    font-size:15px;font-weight:700;color:{B5};
+    box-shadow:0 2px 12px rgba(56,139,253,.4);
+    display:flex;align-items:center;gap:6px;
+    opacity:0;pointer-events:none;transition:opacity .25s"
+  onclick="document.querySelector('[data-testid=collapsedControl]')?.click()">
+  ☰ 메뉴
+</div>
+
+<script>
+(function() {{
+  function syncBtn() {{
+    const collapsed = document.querySelector('[data-testid="collapsedControl"]');
+    const btn = document.getElementById('sb-open-btn');
+    if (!btn) return;
+    if (collapsed) {{
+      btn.style.opacity = '1';
+      btn.style.pointerEvents = 'auto';
+    }} else {{
+      btn.style.opacity = '0';
+      btn.style.pointerEvents = 'none';
+    }}
+  }}
+  const obs = new MutationObserver(syncBtn);
+  obs.observe(document.body, {{childList:true, subtree:true}});
+  setTimeout(syncBtn, 300);
+}})();
+</script>
+""", unsafe_allow_html=True)
+
 
 st.markdown(f"""
 <div style="font-size:28px;font-weight:700;font-style:italic;margin-bottom:4px">
