@@ -28,46 +28,36 @@ B5="#388BFD"; B6="#2F81F7"; B7="#1F6FEB"; B8="#1158C7"
 def up_dn(d): return UP if (d or 0)>=0 else DN
 
 # ── CSS ──────────────────────────────────────────────────────
+# ── KPI 헤더 (fixed 제거, 일반 상단 배치) ─────────────────────
 st.markdown(f"""
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
-<style>
-html,body,[class*="css"]{{
-  background-color:{BG}!important;color:{TXT}!important;
-  font-family:'Inter','Gowun Batang',sans-serif!important;
-  letter-spacing:-.015em!important
-}}
-.block-container{{padding:0 1.5rem 2rem!important;max-width:100%!important;background:transparent!important}}
-[data-testid="stAppViewContainer"]{{background-color:{BG}!important}}
-[data-testid="stSidebar"]{{background-color:{CARD}!important;border-right:1px solid {BORD}!important}}
-#MainMenu,footer,header{{visibility:hidden}}
-p,span,div,label{{color:{TXT}!important}}
-/* 숫자·KPI에 Mono 폰트 자동 적용 */
-[data-testid="stMetricValue"]{{font-family:'JetBrains Mono',monospace!important;font-weight:700!important}}
-/* 버튼 */
-.stButton>button{{
-  background:{C2}!important;color:{TXT}!important;
-  border:1px solid {BORD}!important;border-radius:6px!important;
-  font-family:'Inter',sans-serif!important;font-size:12px!important;
-  font-weight:500!important;transition:all .15s!important}}
-.stButton>button:hover{{
-  border-color:{B5}!important;color:{B5}!important;background:{C3}!important}}
-/* 탭 */
-.stTabs [data-baseweb="tab-list"]{{
-  background:{CARD}!important;border-bottom:1px solid {BORD}!important;gap:0;padding:0}}
-.stTabs [data-baseweb="tab"]{{
-  background:transparent!important;color:{SUB}!important;
-  font-family:'Inter',sans-serif!important;font-size:12px!important;font-weight:500!important;
-  border-bottom:2px solid transparent!important;padding:10px 18px!important}}
-.stTabs [aria-selected="true"]{{color:{TXT}!important;border-bottom-color:{B5}!important}}
-.stTabs [data-baseweb="tab-panel"]{{background:transparent!important;padding:0!important}}
-/* 스크롤바 */
-::-webkit-scrollbar{{width:4px;height:4px}}
-::-webkit-scrollbar-track{{background:{BG}}}
-::-webkit-scrollbar-thumb{{background:{BORD};border-radius:2px}}
-/* select/input */
-[data-baseweb="select"]>div{{background:{C2}!important;border-color:{BORD}!important}}
-</style>
+<div style="background:{BG};padding:16px 0 14px;border-bottom:1px solid {BORD};margin-bottom:1.5rem">
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px">
+    <div>
+      <div style="font-size:24px;font-weight:800;color:{TXT};font-style:italic;line-height:1.2">
+        <span style="background:rgba(47,129,247,.28);padding:1px 8px;border-radius:5px">
+          DY Monitoring
+        </span>
+      </div>
+      <div style="font-size:10px;color:{MUT};margin-top:3px">
+        {now.strftime("%Y-%m-%d %H:%M")} KST · 전일 종가 기준
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div style="background:{rc_bg};color:{rc_t};border:1px solid {rc_bd};
+        padding:4px 14px;border-radius:14px;font-size:10px;font-weight:600;
+        display:inline-block;font-family:'JetBrains Mono',monospace">● {rt}</div>
+      <div style="font-size:9.5px;color:{SUB};margin-top:3px">{reg_explain}</div>
+      <div style="font-size:8.5px;color:{MUT};margin-top:1px">{rn}</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:12px;align-items:stretch;min-height:120px">
+    <div style="flex:0 0 128px;background:{CARD};border:1px solid {BORD};
+      border-radius:10px;overflow:hidden">{get_bull_html()}</div>
+    <div class="kpi-grid">{kpi_html}</div>
+  </div>
+</div>
 """, unsafe_allow_html=True)
+# ← position:fixed 제거했으므로 height:240px 스페이서 불필요
 
 # ── 세션 상태 ─────────────────────────────────────────────────
 now = datetime.now()
