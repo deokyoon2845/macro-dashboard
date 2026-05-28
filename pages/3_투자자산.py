@@ -100,7 +100,6 @@ p,span,div,label,th,td{{color:{TXT}!important;letter-spacing:-.01em!important}}
 </style>
 """, unsafe_allow_html=True)
 
-""", unsafe_allow_html=True)
 
 # ── 사이드바 플로팅 열기 버튼 ──────────────────────────────
 st.markdown(f"""
