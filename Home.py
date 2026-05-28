@@ -1,11 +1,11 @@
-"""Deokyoon's Monitoring — Home (일일 AI 브리핑 포함)"""
+"""DY Monitoring — Home (일일 AI 브리핑 포함)"""
 import streamlit as st
 import pandas as pd
 import json
 from pathlib import Path
 from datetime import datetime
 
-st.set_page_config(page_title="Deokyoon's Monitoring", page_icon="◈",
+st.set_page_config(page_title="DY Monitoring", page_icon="◈",
                    layout="wide", initial_sidebar_state="expanded")
 
 # ── 다크 팔레트 (전 페이지 공통) ───────────────────────────
@@ -63,7 +63,7 @@ if BRIEF_FILE.exists():
 st.markdown(f"""
 <div style="font-family:'MaruBuri',serif;font-size:32px;font-weight:700;font-style:italic;margin-bottom:4px">
   <span style="background:rgba(47,129,247,.28);padding:2px 10px;border-radius:6px">
-    Deokyoon's Monitoring
+    DY Monitoring
   </span>
 </div>
 <div style="font-size:11px;color:{MUT};margin-bottom:1.5rem">
