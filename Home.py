@@ -102,29 +102,40 @@ p,span,div,label{{color:{TXT}!important}}
   padding:6px 16px!important; box-shadow:none!important; transition:all .15s!important}}
 .stButton>button:hover{{border-color:{B5}!important; color:{B5}!important; background:{C3}!important}}
 
-/* ── 사이드바 접힘 토글 버튼 강조 ────────────────────────── */
-[data-testid="collapsedControl"] {{
-  background:{CARD} !important;
-  border:2px solid {B5} !important;
-  border-left:none !important;
-  border-radius:0 10px 10px 0 !important;
-  width:2.4rem !important;
-  top:0.8rem !important;
-  box-shadow:4px 0 14px rgba(56,139,253,.35) !important;
-  transition:all .2s !important;
-}}
-[data-testid="collapsedControl"]:hover {{
-  background:{C2} !important;
-  box-shadow:4px 0 20px rgba(56,139,253,.5) !important;
-}}
-[data-testid="collapsedControl"] svg {{
-  color:{B5} !important;
-  fill:{B5} !important;
-}}
+# ── 사이드바 열기 버튼 + 토글 강조 ─────────────────────────
+_btn_style = (
+    "position:fixed;top:10px;left:8px;z-index:99999;"
+    f"background:{CARD};border:2px solid {B5};border-radius:10px;"
+    "padding:8px 13px;cursor:pointer;font-size:14px;font-weight:700;"
+    f"color:{B5};box-shadow:0 2px 12px rgba(56,139,253,.4);"
+    "display:flex;align-items:center;gap:5px;"
+    "opacity:0;pointer-events:none;transition:opacity .2s"
+)
+_onclick = "document.querySelector('[data-testid=collapsedControl]')?.click()"
+_js = """(function(){
+  function s(){
+    var c=document.querySelector('[data-testid="collapsedControl"]');
+    var b=document.getElementById('sb-btn');
+    if(!b)return;
+    b.style.opacity=c?'1':'0';
+    b.style.pointerEvents=c?'auto':'none';
+  }
+  new MutationObserver(s).observe(document.body,{childList:true,subtree:true});
+  setTimeout(s,400);
+})();"""
 
-</style>
-""", unsafe_allow_html=True)
-""", unsafe_allow_html=True)
+st.markdown(
+    f'<div id="sb-btn" style="{_btn_style}" onclick="{_onclick}">☰ 메뉴</div>'
+    f'<script>{_js}</script>'
+    f'<style>'
+    f'[data-testid="collapsedControl"]{{background:{CARD}!important;'
+    f'border:2px solid {B5}!important;border-left:none!important;'
+    f'border-radius:0 10px 10px 0!important;width:2.5rem!important;'
+    f'top:.8rem!important;box-shadow:4px 0 16px rgba(56,139,253,.4)!important;}}'
+    f'[data-testid="collapsedControl"] svg{{color:{B5}!important;fill:{B5}!important;}}'
+    f'</style>',
+    unsafe_allow_html=True
+)
 
 # ── 사이드바 플로팅 열기 버튼 ──────────────────────────────
 st.markdown(f"""
