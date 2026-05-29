@@ -28,7 +28,7 @@ def fetch_one(ticker):
 def main():
     items = load_portfolio()
     if not items: print("portfolio.json 비어있음."); return
-    tickers = sorted(set(it["ticker"] for it in items if it.get("ticker")))
+    tickers = sorted(set(it["ticker"] for it in items if isinstance(it, dict) and it.get("ticker")))
     print(f"수집: {len(tickers)}개 티커")
     df_old = pd.DataFrame()
     if OUT_FILE.exists():
