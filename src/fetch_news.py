@@ -84,7 +84,7 @@ def main():
     stock_news = {}; seen_sectors = set()
     for it in items:
         if not isinstance(it, dict): 
-        continue # 딕셔너리가 아니면 건너뜀
+            continue # 딕셔너리가 아니면 건너뜀
         if it.get("currency","KRW") != "KRW": continue
         if not name: continue
         if sector and sector!="기타": seen_sectors.add(sector)
