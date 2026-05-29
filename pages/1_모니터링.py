@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from pathlib import Path
 from datetime import datetime, date
-import base64, calendar as cal_lib
+import base64, json, sys
 
 # ════════════════════════════════════════════════════════════════
 # 0. 페이지 설정 — 반드시 최상단, 단 1회
@@ -15,19 +15,25 @@ st.set_page_config(
     layout="wide", initial_sidebar_state="expanded"
 )
 
-# ── 홈 버튼 ──────────────────────────────────────────────────
-with st.sidebar:
-    st.page_link("Home.py", label="🏠  홈으로 돌아가기", use_container_width=True)
-    st.markdown('<div style="height:1px;background:#222A3A;margin:8px 0 12px"></div>',
-                unsafe_allow_html=True)
+# ── 스티키 상단 네비게이션 ───────────────────────────────────
+_ROOT = Path(__file__).parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+try:
+    from utils import render_sticky_nav
+    render_sticky_nav()
+except Exception:
+    pass
 
 # ════════════════════════════════════════════════════════════════
 # 1. 색상 팔레트 + 시간 (모든 f-string보다 먼저 정의)
 # ════════════════════════════════════════════════════════════════
 BG="#0A0D13"; CARD="#111620"; C2="#161C28"; C3="#1C2438"
 BORD="#222A3A"; G="#181F2C"; TXT="#E4EAF6"; SUB="#7A8CA4"; MUT="#4A5668"
-PUR_HI="#4A82E4"; PUR_DK="#79C0FF"; ACC="#4A82E4"; GOLD="#F5A623"
-UP="#2ECC71"; DN="#E74C3C"
+PUR_HI="#4A82E4"; PUR_DK="#79C0FF"; ACC="#4A82E4"
+GOLD="#79C0FF"   # 주황 제거 → 연블루로 대체 (구조용)
+UP="#E24B4A"     # 상승 = 빨강 (한국 증시 관례)
+DN="#388BFD"     # 하락 = 파랑
 B1="#CAE8FF"; B3="#79C0FF"; B4="#58A6FF"
 B5="#388BFD"; B6="#2F81F7"; B7="#1F6FEB"; B8="#1158C7"
 
@@ -36,16 +42,30 @@ now = datetime.now()   # ← KPI 헤더 f-string에서 사용 — 반드시 여�
 def up_dn(d): return UP if (d or 0) >= 0 else DN
 
 # ════════════════════════════════════════════════════════════════
-# 2. 세션 상태 (캘린더 월/연도)
+# 2. (캘린더 세션 상태 제거 — 경제 캘린더는 일정 페이지로 이동)
 # ════════════════════════════════════════════════════════════════
-if "cal_year"  not in st.session_state: st.session_state.cal_year  = now.year
-if "cal_month" not in st.session_state: st.session_state.cal_month = now.month
 
 # ════════════════════════════════════════════════════════════════
 # 3. 데이터 로드 — pages/ 안이므로 .parent.parent 로 루트 접근
 # ════════════════════════════════════════════════════════════════
 DATA_DIR  = Path(__file__).parent.parent / "data"
 ASSET_DIR = Path(__file__).parent.parent / "assets"
+
+# ── 커스텀 폰트 자동 로드 ──────────────────────────────────
+def load_custom_font():
+    fmt_map = {".woff2":"woff2",".woff":"woff",".ttf":"truetype",".otf":"opentype"}
+    for ext, fmt in fmt_map.items():
+        fps = sorted(ASSET_DIR.glob(f"*{ext}"))
+        if not fps: continue
+        fp = fps[0]
+        try:
+            with open(fp,"rb") as f: b64=base64.b64encode(f.read()).decode()
+            return fp.stem, (f"@font-face{{font-family:'{fp.stem}';"
+                f"src:url('data:font/{fmt};base64,{b64}') format('{fmt}');}}")
+        except Exception: continue
+    return None, ""
+CUSTOM_FONT, FONT_FACE_CSS = load_custom_font()
+FF = f"'{CUSTOM_FONT}',sans-serif" if CUSTOM_FONT else "'Inter','Gowun Batang',sans-serif"
 
 @st.cache_data(ttl=3600)
 def load(fn):
@@ -64,11 +84,12 @@ ecos      = load("ecos_latest.parquet")
 # 4. CSS
 # ════════════════════════════════════════════════════════════════
 st.markdown(f"""
+{FONT_FACE_CSS}
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
 <style>
 html,body,[class*="css"]{{
   background-color:{BG}!important;color:{TXT}!important;
-  font-family:'Inter','Gowun Batang',sans-serif!important;
+  font-family:{FF}!important;
   letter-spacing:-.01em!important;line-height:1.4!important}}
 .block-container{{padding:0 2rem 3rem!important;max-width:100%!important;background:transparent!important}}
 [data-testid="stAppViewContainer"]{{background-color:{BG}!important}}
@@ -89,63 +110,7 @@ p,span,div,label,th,td{{color:{TXT}!important}}
 ::-webkit-scrollbar{{width:4px;height:4px}}
 ::-webkit-scrollbar-track{{background:{BG}}}
 ::-webkit-scrollbar-thumb{{background:{BORD};border-radius:2px}}
-
-/* ── 사이드바 접힘 토글 버튼 강조 ────────────────────────── */
-[data-testid="collapsedControl"] {{
-  background:{CARD} !important;
-  border:2px solid {B5} !important;
-  border-left:none !important;
-  border-radius:0 10px 10px 0 !important;
-  width:2.4rem !important;
-  top:0.8rem !important;
-  box-shadow:4px 0 14px rgba(56,139,253,.35) !important;
-  transition:all .2s !important;
-}}
-[data-testid="collapsedControl"]:hover {{
-  background:{C2} !important;
-  box-shadow:4px 0 20px rgba(56,139,253,.5) !important;
-}}
-[data-testid="collapsedControl"] svg {{
-  color:{B5} !important;
-  fill:{B5} !important;
-}}
-
 </style>
-""", unsafe_allow_html=True)
-
-# ── 사이드바 플로팅 열기 버튼 ──────────────────────────────
-st.markdown(f"""
-<div id="sb-open-btn"
-  style="position:fixed;top:10px;left:8px;z-index:99999;
-    background:{CARD};border:2px solid {B5};border-radius:10px;
-    padding:8px 12px;cursor:pointer;
-    font-size:15px;font-weight:700;color:{B5};
-    box-shadow:0 2px 12px rgba(56,139,253,.4);
-    display:flex;align-items:center;gap:6px;
-    opacity:0;pointer-events:none;transition:opacity .25s"
-  onclick="document.querySelector('[data-testid=collapsedControl]')?.click()">
-  ☰ 메뉴
-</div>
-
-<script>
-(function() {{
-  function syncBtn() {{
-    const collapsed = document.querySelector('[data-testid="collapsedControl"]');
-    const btn = document.getElementById('sb-open-btn');
-    if (!btn) return;
-    if (collapsed) {{
-      btn.style.opacity = '1';
-      btn.style.pointerEvents = 'auto';
-    }} else {{
-      btn.style.opacity = '0';
-      btn.style.pointerEvents = 'none';
-    }}
-  }}
-  const obs = new MutationObserver(syncBtn);
-  obs.observe(document.body, {{childList:true, subtree:true}});
-  setTimeout(syncBtn, 300);
-}})();
-</script>
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════
@@ -311,9 +276,9 @@ def lc(traces, title="", h=270, zero=False):
     return fig
 
 HM_SCALE = [
-    [0.00,"#67000D"],[0.25,"#A50F15"],[0.40,"#CB181D"],
+    [0.00,"#1158C7"],[0.25,"#1F6FEB"],[0.40,"#388BFD"],
     [0.47,"#1C2128"],[0.53,"#1C2128"],
-    [0.60,"#00441B"],[0.75,"#238B45"],[1.00,"#41AB5D"],
+    [0.60,"#A50F15"],[0.75,"#CB181D"],[1.00,"#E24B4A"],
 ]
 
 def make_treemap(stocks, title="", h=580):
@@ -338,6 +303,150 @@ def make_treemap(stocks, title="", h=580):
         title=dict(text=title, font=dict(size=11, color=SUB), x=0.01),
         paper_bgcolor=CARD, height=h, margin=dict(l=0,r=0,t=30,b=0))
     return fig
+
+
+# ── JSON 로더 (워치리스트/이벤트용) ──────────────────────────
+def load_json_file(fn, default=None):
+    p = DATA_DIR / fn
+    if not p.exists():
+        return default if default is not None else {}
+    try:
+        with open(p, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return default if default is not None else {}
+
+# ════════════════════════════════════════════════════════════════
+# 워치리스트 — 발산 막대 (히트맵 대체)
+# [삽입 위치] make_treemap 함수 정의 다음에 추가
+# ════════════════════════════════════════════════════════════════
+@st.cache_data(ttl=300)
+def fetch_watchlist_quotes(tickers_tuple):
+    """yfinance로 관심종목 전일 대비 등락률 일괄 수집 (5분 캐시)"""
+    import yfinance as yf
+    out = {}
+    try:
+        data = yf.download(list(tickers_tuple), period="5d",
+                           interval="1d", progress=False, group_by="ticker")
+    except Exception:
+        return out
+    for tk in tickers_tuple:
+        try:
+            if len(tickers_tuple) == 1:
+                closes = data["Close"].dropna()
+            else:
+                closes = data[tk]["Close"].dropna()
+            if len(closes) >= 2:
+                cur, prev = float(closes.iloc[-1]), float(closes.iloc[-2])
+                pct = (cur/prev - 1) * 100 if prev else 0.0
+                vol = None
+                try:
+                    vols = (data["Volume"] if len(tickers_tuple)==1
+                            else data[tk]["Volume"]).dropna()
+                    if len(vols) >= 6:
+                        avg5 = vols.iloc[-6:-1].mean()
+                        vol = float(vols.iloc[-1]/avg5) if avg5 else None
+                except Exception:
+                    pass
+                out[tk] = {"price": cur, "pct": pct, "vol_ratio": vol}
+        except Exception:
+            continue
+    return out
+
+def render_watchlist_group(group, quotes):
+    """단일 그룹을 발산 막대로 렌더링 (상승=빨강 우측, 하락=파랑 좌측)"""
+    rows = []
+    for item in group.get("tickers", []):
+        tk = item["ticker"]; q = quotes.get(tk)
+        if not q:
+            continue
+        rows.append({
+            "name": item["name"], "ticker": tk,
+            "price": q["price"], "pct": q["pct"],
+            "vol_ratio": q.get("vol_ratio"),
+        })
+    if not rows:
+        st.markdown(
+            f'<div style="background:{C2};border-radius:8px;padding:14px;'
+            f'font-size:11px;color:{MUT}">데이터 수집 중 — 잠시 후 새로고침</div>',
+            unsafe_allow_html=True)
+        return
+    rows.sort(key=lambda x: x["pct"], reverse=True)
+    scale = max(4.0, max(abs(r["pct"]) for r in rows))  # 동적 스케일
+
+    body = ""
+    for r in rows:
+        up = r["pct"] >= 0
+        clr = UP if up else DN
+        w = min(abs(r["pct"]) / scale * 100, 100)
+        sym = "▲" if up else "▼"
+        vol_badge = ""
+        if r.get("vol_ratio") and r["vol_ratio"] >= 2.0:
+            vol_badge = (f'<span style="background:rgba(245,166,35,.18);color:#F5A623;'
+                         f'font-size:8px;padding:1px 5px;border-radius:4px;'
+                         f'margin-left:4px;font-weight:700">거래량 급증</span>')
+        left_bar = (f'<div style="height:11px;width:{w}%;background:{DN};'
+                    f'border-radius:3px 0 0 3px"></div>') if not up else ""
+        right_bar = (f'<div style="height:11px;width:{w}%;background:{UP};'
+                     f'border-radius:0 3px 3px 0"></div>') if up else ""
+        body += f"""
+<div style="display:flex;align-items:center;gap:10px;padding:5px 0">
+  <div style="width:160px;flex-shrink:0;overflow:hidden">
+    <div style="font-size:12px;font-weight:500;white-space:nowrap;
+      text-overflow:ellipsis;overflow:hidden">{r['name']}{vol_badge}</div>
+    <div style="font-size:9px;color:{MUT};font-family:'JetBrains Mono',monospace">
+      {r['ticker']} · {r['price']:,.2f}</div>
+  </div>
+  <div style="flex:1;display:flex;align-items:center;height:16px">
+    <div style="flex:1;display:flex;justify-content:flex-end">{left_bar}</div>
+    <div style="width:1px;height:16px;background:{BORD}"></div>
+    <div style="flex:1;display:flex;justify-content:flex-start">{right_bar}</div>
+  </div>
+  <div style="width:62px;flex-shrink:0;text-align:right;font-size:12px;
+    font-weight:600;font-family:'JetBrains Mono',monospace;color:{clr}">
+    {sym}{abs(r['pct']):.2f}%</div>
+</div>"""
+
+    st.markdown(f"""
+<div style="background:{CARD};border:1px solid {BORD};border-radius:10px;padding:14px 16px">
+  <div style="font-size:13px;font-weight:600;color:{TXT};margin-bottom:10px">
+    {group['name']}</div>
+  {body}
+</div>""", unsafe_allow_html=True)
+
+def render_watchlist():
+    """watchlist.json 읽어 전체 워치리스트 렌더링"""
+    wl = load_json_file("watchlist.json", {})
+    groups = wl.get("groups", []) if isinstance(wl, dict) else []
+    if not groups:
+        st.info("data/watchlist.json에 관심종목을 추가하세요.")
+        return
+
+    # 전 종목 일괄 수집 (1회 API 호출)
+    all_tickers = tuple(sorted({it["ticker"] for g in groups
+                                for it in g.get("tickers", [])}))
+    quotes = fetch_watchlist_quotes(all_tickers) if all_tickers else {}
+
+    # 범례
+    st.markdown(
+        f'<div style="display:flex;gap:14px;align-items:center;margin-bottom:12px;'
+        f'font-size:11px;color:{SUB}">'
+        f'<span style="display:flex;align-items:center;gap:5px">'
+        f'<span style="width:11px;height:11px;border-radius:2px;background:{UP}"></span>상승</span>'
+        f'<span style="display:flex;align-items:center;gap:5px">'
+        f'<span style="width:11px;height:11px;border-radius:2px;background:{DN}"></span>하락</span>'
+        f'<span style="margin-left:auto;font-size:10px;color:{MUT}">'
+        f'한국 증시 관례 · 전일 대비 · 등락률 내림차순 정렬</span></div>',
+        unsafe_allow_html=True)
+
+    # 2열 그리드
+    for i in range(0, len(groups), 2):
+        cols = st.columns(2)
+        for j, g in enumerate(groups[i:i+2]):
+            with cols[j]:
+                render_watchlist_group(g, quotes)
+        st.markdown('<div style="height:10px"></div>', unsafe_allow_html=True)
+
 
 # ════════════════════════════════════════════════════════════════
 # 6. 시장 레짐 계산 — regime() 이후 변수들 사용 가능
@@ -476,6 +585,13 @@ st.markdown(f"""
   </div>
 </div>
 """, unsafe_allow_html=True)
+
+# ════════════════════════════════════════════════════════════════
+# 9. 섹션 0 — 워치리스트 (최우선 · 발산 막대)
+# ════════════════════════════════════════════════════════════════
+sh("★","관심 종목 워치리스트","Watchlist")
+render_watchlist()
+st.markdown('<div style="height:1.2rem"></div>', unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════
 # 9. 섹션 1 — 시장 심리
@@ -694,8 +810,9 @@ US_STOCKS = {
     "PH":("Parker",62),"WM":("Waste Mgmt",60),"SHW":("Sherwin",56),
     "MMC":("Marsh",54),"ITW":("IllinoisTool",52),"TGT":("Target",50),
 }
-st.plotly_chart(make_treemap(US_STOCKS,"미국 시총 TOP 100 히트맵",h=600),
-                use_container_width=True)
+with st.expander("미국 시총 TOP 100 히트맵 (참고)", expanded=False):
+    st.plotly_chart(make_treemap(US_STOCKS,"미국 시총 TOP 100",h=600),
+                    use_container_width=True)
 
 # ════════════════════════════════════════════════════════════════
 # 13. 섹션 5 — 한국 증시
@@ -767,8 +884,9 @@ KR_STOCKS = {
     "KR_SKINN":("SK이노베이션",9),"KR_HLBI":("에이치엘비",18),
     "KR_KAKAOG":("카카오게임즈",8),"KR_PARLABS":("펄어비스",7),
 }
-st.plotly_chart(make_treemap(KR_STOCKS,"한국 시총 TOP 60 히트맵 (KOSPI+KOSDAQ)",h=600),
-                use_container_width=True)
+with st.expander("한국 시총 TOP 60 히트맵 (참고)", expanded=False):
+    st.plotly_chart(make_treemap(KR_STOCKS,"한국 시총 TOP 60 (KOSPI+KOSDAQ)",h=600),
+                    use_container_width=True)
 
 # ════════════════════════════════════════════════════════════════
 # 14. 섹션 6 — 글로벌 증시
@@ -916,10 +1034,9 @@ with c2:
 # ════════════════════════════════════════════════════════════════
 # 18. 섹션 10 — 한국 매크로 & 경제 캘린더
 # ════════════════════════════════════════════════════════════════
-sh("10","한국 매크로 & 경제 캘린더")
-col_ecos,col_cal = st.columns([1,1.5])
-
-with col_ecos:
+sh("10","한국 매크로","Korea Macro")
+# (경제 캘린더 제거 → 일정 페이지로 이동, 매크로 전체폭)
+with st.container():
     st.markdown(
         f'<div style="font-size:14px;font-weight:600;color:{SUB};margin-bottom:8px">'
         f'한국 매크로 · ECOS TOP 10</div>',unsafe_allow_html=True)
@@ -968,119 +1085,6 @@ with col_ecos:
     else:
         no_data("ECOS 데이터")
 
-with col_cal:
-    st.markdown(
-        f'<div style="font-size:14px;font-weight:600;color:{SUB};margin-bottom:4px">'
-        f'경제 캘린더</div>',unsafe_allow_html=True)
-    nav1,nav2,nav3 = st.columns([1,3,1])
-    with nav1:
-        if st.button("◀ 이전달",key="cal_prev"):
-            if st.session_state.cal_month==1:
-                st.session_state.cal_month=12; st.session_state.cal_year-=1
-            else: st.session_state.cal_month-=1
-            st.rerun()
-    with nav2:
-        mo=["1월","2월","3월","4월","5월","6월",
-            "7월","8월","9월","10월","11월","12월"]
-        st.markdown(
-            f'<div style="text-align:center;font-size:15px;font-weight:700;'
-            f'color:{TXT};padding:6px 0">'
-            f'{st.session_state.cal_year}년 {mo[st.session_state.cal_month-1]}</div>',
-            unsafe_allow_html=True)
-    with nav3:
-        if st.button("다음달 ▶",key="cal_next"):
-            if st.session_state.cal_month==12:
-                st.session_state.cal_month=1; st.session_state.cal_year+=1
-            else: st.session_state.cal_month+=1
-            st.rerun()
-
-    CAL_EVENTS = {
-        date(2026,5,29):[("bok","한국 금통위")],
-        date(2026,6,5): [("econ","美 NFP (5월)")],
-        date(2026,6,9): [("fomc","FOMC 금리결정")],
-        date(2026,6,11):[("econ","美 CPI (5월)")],
-        date(2026,6,28):[("bok","한국 금통위")],
-        date(2026,7,2): [("econ","美 NFP (6월)")],
-        date(2026,7,10):[("bok","한국 금통위")],
-        date(2026,7,15):[("econ","美 CPI (6월)")],
-        date(2026,7,22):[("earn","META 실적")],
-        date(2026,7,23):[("earn","GOOGL 실적")],
-        date(2026,7,28):[("fomc","FOMC 금리결정"),("earn","MSFT 실적")],
-        date(2026,7,29):[("earn","AAPL 실적")],
-        date(2026,8,1): [("earn","AMZN 실적")],
-        date(2026,8,7): [("econ","美 NFP (7월)")],
-        date(2026,8,12):[("econ","美 CPI (7월)")],
-        date(2026,8,27):[("earn","NVDA 실적"),("bok","한국 금통위")],
-        date(2026,9,15):[("fomc","FOMC 금리결정")],
-        date(2026,10,16):[("bok","한국 금통위")],
-        date(2026,10,27):[("fomc","FOMC 금리결정")],
-        date(2026,11,27):[("bok","한국 금통위")],
-        date(2026,12,8): [("fomc","FOMC 금리결정")],
-    }
-    TC = {
-        "fomc":(B5,"rgba(47,129,247,.2)"),
-        "bok": (PUR_DK,"rgba(88,166,255,.2)"),
-        "econ":(UP,"rgba(63,185,80,.2)"),
-        "earn":(GOLD,"rgba(245,166,35,.2)"),
-    }
-
-    def build_calendar(year,month,events):
-        cal_lib.setfirstweekday(0)
-        weeks=cal_lib.monthcalendar(year,month); today=date.today()
-        day_hd=""
-        for dn_,dc2 in [("월",TXT),("화",TXT),("수",TXT),("목",TXT),
-                         ("금",TXT),("토",B4),("일",DN)]:
-            day_hd+=(f'<div style="text-align:center;font-size:10px;font-weight:600;'
-                     f'color:{dc2};padding:5px 0">{dn_}</div>')
-        cells=""
-        for wk in weeks:
-            for day_num in wk:
-                if day_num==0:
-                    cells+=(f'<div style="background:{BG};border-radius:6px;'
-                             f'min-height:72px"></div>')
-                else:
-                    d=date(year,month,day_num)
-                    is_today=(d==today); is_past=(d<today)
-                    evs=events.get(d,[])
-                    ev_html=""
-                    for ev_type,ev_name in evs[:2]:
-                        ec,eb=TC.get(ev_type,(MUT,C2))
-                        ev_short=ev_name[:10]+("…" if len(ev_name)>10 else "")
-                        ev_html+=(f'<div style="background:{eb};color:{ec};'
-                                   f'border-radius:3px;font-size:8px;padding:1px 4px;'
-                                   f'margin-top:2px;overflow:hidden;white-space:nowrap;'
-                                   f'font-family:JetBrains Mono,monospace">{ev_short}</div>')
-                    if len(evs)>2:
-                        ev_html+=f'<div style="font-size:8px;color:{MUT}">+{len(evs)-2}</div>'
-                    if is_today:
-                        bg_d=B5; brd=f"2px solid {B5}"; day_c="#FFFFFF"
-                    elif is_past:
-                        bg_d=BG; brd=f"1px solid {BORD}"; day_c=MUT
-                    else:
-                        bg_d=CARD; brd=f"1px solid {BORD}"; day_c=TXT
-                    cells+=(f'<div style="background:{bg_d};border:{brd};'
-                             f'border-radius:6px;padding:5px;min-height:72px;overflow:hidden">'
-                             f'<div style="font-size:12px;font-weight:'
-                             f'{"700" if is_today else "400"};color:{day_c}">{day_num}</div>'
-                             f'{ev_html}</div>')
-        legend=""
-        for lbl,et in [("FOMC","fomc"),("금통위","bok"),("경제지표","econ"),("실적","earn")]:
-            ec,eb=TC[et]
-            legend+=(f'<span style="background:{eb};color:{ec};border-radius:3px;'
-                     f'font-size:9px;padding:2px 7px;margin-right:6px;'
-                     f'font-family:JetBrains Mono,monospace">{lbl}</span>')
-        return (f'<div style="background:{CARD};border:1px solid {BORD};'
-                f'border-radius:10px;padding:12px">'
-                f'<div style="display:grid;grid-template-columns:repeat(7,1fr);'
-                f'gap:3px;margin-bottom:3px">{day_hd}</div>'
-                f'<div style="display:grid;grid-template-columns:repeat(7,1fr);'
-                f'gap:3px">{cells}</div>'
-                f'<div style="margin-top:10px;padding-top:8px;'
-                f'border-top:1px solid {BORD}">{legend}</div></div>')
-
-    st.markdown(build_calendar(st.session_state.cal_year,
-                               st.session_state.cal_month, CAL_EVENTS),
-                unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════
 # 19. 푸터
