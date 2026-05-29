@@ -1,0 +1,189 @@
+[
+  {
+    "id": "e0a1b2c3",
+    "name": "에이피알",
+    "ticker": "278470.KS",
+    "sector": "미용",
+    "market": "KOSPI",
+    "currency": "KRW",
+    "account": "일반",
+    "lots": [
+      {
+        "date": "2026-05-29",
+        "qty": 32,
+        "price": 397000.0,
+        "type": "buy"
+      }
+    ]
+  },
+  {
+    "id": "f1b2c3d4",
+    "name": "삼성전자",
+    "ticker": "005930.KS",
+    "sector": "반도체",
+    "market": "KOSPI",
+    "currency": "KRW",
+    "account": "일반",
+    "lots": [
+      {
+        "date": "2026-05-29",
+        "qty": 32,
+        "price": 293500.0,
+        "type": "buy"
+      }
+    ]
+  },
+  {
+    "id": "a2c3d4e5",
+    "name": "한화에어로스페이스",
+    "ticker": "012450.KS",
+    "sector": "우주항공",
+    "market": "KOSPI",
+    "currency": "KRW",
+    "account": "일반",
+    "lots": [
+      {
+        "date": "2026-05-29",
+        "qty": 4,
+        "price": 1227000.0,
+        "type": "buy"
+      }
+    ]
+  },
+  {
+    "id": "b3d4e5f6",
+    "name": "HD현대일렉트릭",
+    "ticker": "267260.KS",
+    "sector": "유틸리티",
+    "market": "KOSPI",
+    "currency": "KRW",
+    "account": "일반",
+    "lots": [
+      {
+        "date": "2026-05-29",
+        "qty": 8,
+        "price": 1058000.0,
+        "type": "buy"
+      }
+    ]
+  },
+  {
+    "id": "c4e5f6a7",
+    "name": "키움증권",
+    "ticker": "039490.KS",
+    "sector": "증권·금융",
+    "market": "KOSPI",
+    "currency": "KRW",
+    "account": "일반",
+    "lots": [
+      {
+        "date": "2026-05-29",
+        "qty": 13,
+        "price": 407333.0,
+        "type": "buy"
+      }
+    ]
+  },
+  {
+    "id": "d5f6a7b8",
+    "name": "한국금융지주",
+    "ticker": "071050.KS",
+    "sector": "증권·금융",
+    "market": "KOSPI",
+    "currency": "KRW",
+    "account": "일반",
+    "lots": [
+      {
+        "date": "2026-05-29",
+        "qty": 23,
+        "price": 236500.0,
+        "type": "buy"
+      }
+    ]
+  },
+  {
+    "id": "e6a7b8c9",
+    "name": "한화시스템",
+    "ticker": "272210.KS",
+    "sector": "방산",
+    "market": "KOSPI",
+    "currency": "KRW",
+    "account": "일반",
+    "lots": [
+      {
+        "date": "2026-05-29",
+        "qty": 35,
+        "price": 123077.0,
+        "type": "buy"
+      }
+    ]
+  },
+  {
+    "id": "f7b8c9d0",
+    "name": "DB증권",
+    "ticker": "016610.KS",
+    "sector": "증권·금융",
+    "market": "KOSPI",
+    "currency": "KRW",
+    "account": "일반",
+    "lots": [
+      {
+        "date": "2026-05-29",
+        "qty": 1880,
+        "price": 11120.0,
+        "type": "buy"
+      }
+    ]
+  },
+  {
+    "id": "a8c9d0e1",
+    "name": "TIGER 코리아휴머노이드로봇산업",
+    "ticker": "0148J0.KS",
+    "sector": "로봇·자동화",
+    "market": "KOSPI",
+    "currency": "KRW",
+    "account": "연금저축",
+    "lots": [
+      {
+        "date": "2026-05-29",
+        "qty": 1872,
+        "price": 13865.0,
+        "type": "buy"
+      }
+    ]
+  },
+  {
+    "id": "b9d0e1f2",
+    "name": "TIGER 코리아휴머노이드로봇산업",
+    "ticker": "0148J0.KS",
+    "sector": "로봇·자동화",
+    "market": "KOSPI",
+    "currency": "KRW",
+    "account": "DC",
+    "lots": [
+      {
+        "date": "2026-05-29",
+        "qty": 1638,
+        "price": 12879.0,
+        "type": "buy"
+      }
+    ]
+  },
+  {
+    "id": "c0e1f2a3",
+    "name": "삼성전자SK하이닉스채권혼합50",
+    "ticker": "0162Z0.KS",
+    "sector": "기타",
+    "market": "KOSPI",
+    "currency": "KRW",
+    "account": "일반",
+    "lots": [
+      {
+        "date": "2026-05-29",
+        "qty": 673,
+        "price": 13660.0,
+        "type": "buy"
+      }
+    ]
+  }
+]
