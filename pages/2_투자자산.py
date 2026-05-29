@@ -559,44 +559,48 @@ def main():
 
     render_ticker_bar(positions)
 
+# ── [수정된 부분 시작] ───────────────────────────
     df = pd.DataFrame(positions) if positions else pd.DataFrame()
-    if df.empty:
-        st.markdown(f'<div style="background:{CARD};border:1px solid {BORD};border-radius:12px;padding:60px;text-align:center;margin-top:20px"><div style="font-size:40px;margin-bottom:16px">📊</div><div style="font-size:18px;font-weight:600;color:{TXT};margin-bottom:8px">{"이 계좌에 보유 종목 없음" if sel_account else "보유 종목 없음"}</div><div style="font-size:13px;color:{SUB}">우측 상단 ⚙️ 종목 관리에서 종목을 추가해주세요</div></div>', unsafe_allow_html=True)
-        st.stop()
-
-    # KPI 지표 정밀 계산
-    df_p = df[df["current"].notna()] if "current" in df.columns else pd.DataFrame()
-    if not df_p.empty:
-        tv = df_p["value_krw"].sum()
-        tc_v = df_p["cost_krw"].sum()
-        tp = df_p["pnl_krw"].sum()
-        tpct = (tp / tc_v * 100) if tc_v > 0 else 0
-        td = df_p["daily_pnl_krw"].sum()
-        dpct = (td / (tv - td) * 100) if (tv - td) > 0 else 0
-        tv_usd = tv / usdkrw
-    else:
-        tv, tc_v, tp, tpct, td, dpct, tv_usd = 0, 0, 0, 0, 0, 0, 0
-
-    hist_df = compute_daily_pf(portfolio_view, prices, mdf)
-
-    # ── 대시보드 메인 레이아웃 (좌:우 = 4:6) ───────────────────────────
-    left, right = st.columns([4, 6], gap="medium")
     
-    with left:
-        pnl_bg = "rgba(226,75,74,.12)" if td >= 0 else "rgba(56,139,253,.12)"
-        pnl_clr = UP if td >= 0 else DN
-        sign = "▲" if td >= 0 else "▼"
-        st.markdown(f"""
-        <div style="background:{CARD};border:1px solid {BORD};border-radius:12px;padding:24px;margin-bottom:10px">
-          <div style="font-size:12px;color:{SUB};font-weight:500;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">총 평가금액</div>
-          <div style="font-size:36px;font-weight:800;color:{TXT};font-family:'JetBrains Mono',monospace;line-height:1;margin-bottom:12px">{tv:,.0f}<span style="font-size:14px;font-weight:500;color:{SUB}">원</span></div>
-          <div style="display:flex;gap:8px;align-items:center"><span style="background:{pnl_bg};color:{pnl_clr};padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600;font-family:'JetBrains Mono',monospace">{sign} 전일 {td:+,.0f}원 ({dpct:+.2f}%)</span></div>
-          <div style="margin-top:10px;font-size:11px;color:{SUB};font-family:'JetBrains Mono',monospace">≈ ${tv_usd:,.0f} · 환율 {usdkrw:,.0f}</div>
-        </div>""", unsafe_allow_html=True)
+    if not df.empty:
+        # 1. 이름과 티커를 기준으로 수량과 금액 합산 (계좌별로 분리되어 있던 항목들 통합)
+        df = df.groupby(["name", "ticker"]).agg({
+            "qty": "sum",
+            "value_krw": "sum",
+            "cost_krw": "sum",
+            "daily_pnl_krw": "sum",
+            "pnl_krw": "sum",
+            "current": "first"
+        }).reset_index()
+        
+        # 2. 통합된 데이터 기반으로 수익률 재계산
+        df["pnl_pct"] = (df["pnl_krw"] / df["cost_krw"]) * 100
+        df["daily_pct"] = (df["daily_pnl_krw"] / (df["value_krw"] - df["daily_pnl_krw"])) * 100
+        
+        # 3. 평가금액 기준 내림차순 정렬
+        df = df.sort_values("value_krw", ascending=False)
 
-        df_sorted_val = df_p.sort_values("value_krw", ascending=False) if not df_p.empty else pd.DataFrame()
-        segments = ""
-        holding_rows = ""
+    holding_rows = ""
+    # 4. 이제 정제된 df를 사용하여 HTML 루프 생성
+    for i, row in df.iterrows():
+        clr = HOLD_COLORS[i % len(HOLD_COLORS)]
+        w = row["value_krw"] / tv * 100 if tv > 0 else 0
+        pclr = UP if row["pnl_pct"] >= 0 else DN
+        sp = "+" if row["pnl_pct"] >= 0 else ""
+        
+        holding_rows += f"""
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid {BORD};gap:8px">
+          <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+            <span style="width:8px;height:8px;border-radius:50%;background:{clr};flex-shrink:0"></span>
+            <span style="font-size:12px;color:{TXT};font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{row['name']}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;flex-shrink:0">
+            <span style="font-size:11px;color:{SUB};min-width:36px;text-align:right">{w:.1f}%</span>
+            <span style="font-size:12px;font-weight:600;color:{TXT};font-family:'JetBrains Mono',monospace;min-width:70px;text-align:right">{row['value_krw']:,.0f}</span>
+            <span style="font-size:11px;font-weight:600;color:{pclr};font-family:'JetBrains Mono',monospace;min-width:56px;text-align:right">{sp}{row['pnl_pct']:.2f}%</span>
+          </div>
+        </div>"""
+    # ── [수정된 부분 끝] ───────────────────────────
         
         if not df_sorted_val.empty:
             for i, ((_, row), clr) in enumerate(zip(df_sorted_val.iterrows(), HOLD_COLORS)):
