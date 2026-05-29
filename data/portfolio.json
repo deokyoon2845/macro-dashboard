@@ -1,0 +1,8 @@
+{
+  "name": "삼성전자", "ticker": "005930.KS", "currency": "KRW",
+  "sector": "반도체",
+  "account": "일반",
+  "lots": [
+    {"date": "2024-01-15", "qty": 10, "price": 72000, "type": "buy"}
+  ]
+}
