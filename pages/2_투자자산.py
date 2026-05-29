@@ -559,13 +559,12 @@ def main():
 
     render_ticker_bar(positions)
 
-# ── 기존 코드(데이터프레임 생성 부분)를 아래처럼 수정 ───────────────────
-    
-    # 1. 포트폴리오를 계좌 + 종목명으로 그룹화하여 합산
+# 1. 데이터프레임 생성 및 계좌별/종목별 합산
     df = pd.DataFrame(positions)
     if not df.empty:
-        # 같은 계좌의 같은 종목이 여러 번 들어있을 경우 수량과 평가금액 합산
-        df = df.groupby(["account", "name", "ticker"]).agg({
+        # 'name'과 'ticker'를 기준으로 그룹화하여 수량과 금액 합산
+        # (계좌를 구분해야 한다면 groupby에 'account'를 유지하세요)
+        df = df.groupby(["name", "ticker"]).agg({
             "qty": "sum",
             "value_krw": "sum",
             "cost_krw": "sum",
@@ -574,15 +573,33 @@ def main():
             "current": "first"
         }).reset_index()
         
-        # 수익률 및 비중 재계산
+        # 수익률 재계산
         df["pnl_pct"] = (df["pnl_krw"] / df["cost_krw"]) * 100
         df["daily_pct"] = (df["daily_pnl_krw"] / (df["value_krw"] - df["daily_pnl_krw"])) * 100
         
-        # 2. 정렬: 평가금액 순으로 정렬
+        # 평가금액 기준 내림차순 정렬
         df = df.sort_values("value_krw", ascending=False)
 
-    # 이제 이 df를 사용하여 아래의 rows_html 루프를 돌리면 
-    # 종목이 중복되지 않고 깔끔하게 합쳐져서 나타납니다.
+    # 2. 이제 깔끔해진 df를 사용하여 HTML 생성
+    holding_rows = ""
+    for i, row in df.iterrows():
+        clr = HOLD_COLORS[i % len(HOLD_COLORS)]
+        w = row["value_krw"] / tv * 100 if tv > 0 else 0
+        pclr = UP if row["pnl_pct"] >= 0 else DN
+        sp = "+" if row["pnl_pct"] >= 0 else ""
+        
+        holding_rows += f"""
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid {BORD};gap:8px">
+          <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+            <span style="width:8px;height:8px;border-radius:50%;background:{clr};flex-shrink:0"></span>
+            <span style="font-size:12px;color:{TXT};font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{row['name']}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;flex-shrink:0">
+            <span style="font-size:11px;color:{SUB};min-width:36px;text-align:right">{w:.1f}%</span>
+            <span style="font-size:12px;font-weight:600;color:{TXT};font-family:'JetBrains Mono',monospace;min-width:70px;text-align:right">{row['value_krw']:,.0f}</span>
+            <span style="font-size:11px;font-weight:600;color:{pclr};font-family:'JetBrains Mono',monospace;min-width:56px;text-align:right">{sp}{row['pnl_pct']:.2f}%</span>
+          </div>
+        </div>"""
 
     # KPI 지표 정밀 계산
     df_p = df[df["current"].notna()] if "current" in df.columns else pd.DataFrame()
