@@ -1,5 +1,5 @@
 """
-DY Monitoring — Home  (버그픽스 + 스티키 네비)
+DY Monitoring — Home  (계좌별 잔고 추이 차트 적용 + 버그픽스 + 스티키 네비)
 """
 import streamlit as st
 import pandas as pd
@@ -25,14 +25,11 @@ except Exception:
     pass
 
 # ════════════════════════════════════════════════════════════════
-# 경로
+# 경로 및 기본 설정
 # ════════════════════════════════════════════════════════════════
 DATA_DIR  = Path(__file__).parent / "data"
 ASSET_DIR = Path(__file__).parent / "assets"
 
-# ════════════════════════════════════════════════════════════════
-# 커스텀 폰트 자동 로드
-# ════════════════════════════════════════════════════════════════
 def load_custom_font():
     fmt_map = {".woff2":"woff2",".woff":"woff",".ttf":"truetype",".otf":"opentype"}
     for ext, fmt in fmt_map.items():
@@ -60,6 +57,10 @@ BLUE = "#388BFD"; B5   = "#388BFD"; B6   = "#2F81F7"; B7   = "#1F6FEB"
 PUR_DK = "#79C0FF"; GOLD = "#F5A623"
 UP = "#2ECC71"; DN = "#E74C3C"
 
+# 계좌별 색상 및 라벨 정의
+ACCT_COLORS = {"일반":"#388BFD", "DC":"#79C0FF", "연금저축":"#1F6FEB"}
+ACCT_LABELS = {"일반":"💳 일반 종합매매", "DC":"🏢 퇴직연금 DC", "연금저축":"🏦 연금저축펀드"}
+
 now = datetime.now()
 BRIEF_KEY = "home_brief"
 
@@ -70,21 +71,24 @@ BRIEF_KEY = "home_brief"
 def load_pq(fn):
     p = DATA_DIR / fn
     if not p.exists(): return pd.DataFrame()
-    df = pd.read_parquet(p)
-    if "date" in df.columns: df["date"] = pd.to_datetime(df["date"])
-    return df
+    try:
+        df = pd.read_parquet(p)
+        if "date" in df.columns: df["date"] = pd.to_datetime(df["date"])
+        return df
+    except Exception: return pd.DataFrame()
 
 def load_json(fn, default=None):
     p = DATA_DIR / fn
     if not p.exists(): return default or {}
-    with open(p, encoding="utf-8") as f: return json.load(f)
+    try:
+        with open(p, encoding="utf-8") as f: return json.load(f)
+    except Exception: return default or {}
 
 def get_secret(k, default=""):
     try:    return st.secrets[k]
     except: return os.environ.get(k, default)
 
 def safe(v):
-    """HTML 이스케이프 — 브리핑 값이 HTML 구조를 깨는 것 방지"""
     return html_lib.escape(str(v)) if v else ""
 
 # ════════════════════════════════════════════════════════════════
@@ -92,30 +96,22 @@ def safe(v):
 # ════════════════════════════════════════════════════════════════
 st.markdown(
     FONT_FACE_CSS +
-    """<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800"""
-    """&family=JetBrains+Mono:wght@400;500;600&family=Gowun+Batang:wght@400;700&display=swap" """
-    """rel="stylesheet">""" +
+    """<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">""" +
     f"""<style>
-html,body,[class*="css"]{{
-  background-color:{BG}!important;color:{TXT}!important;
-  font-family:{FF}!important;letter-spacing:-.01em!important}}
-.block-container{{padding:1.2rem 2rem 3rem!important;max-width:100%!important;background:transparent!important}}
-[data-testid="stAppViewContainer"]{{background-color:{BG}!important}}
-[data-testid="stSidebar"]{{background-color:{CARD}!important;border-right:1px solid {BORD}!important}}
-#MainMenu,footer,header{{visibility:hidden}}
-p,span,div,label{{color:{TXT}!important}}
-.stButton>button{{
-  background:{C2}!important;color:{TXT}!important;
-  border:1px solid {BORD}!important;border-radius:8px!important;
-  font-family:{FF}!important;font-size:12px!important;font-weight:500!important;
-  padding:6px 16px!important;box-shadow:none!important;transition:all .15s!important}}
-.stButton>button:hover{{border-color:{B5}!important;color:{B5}!important;background:{C3}!important}}
-</style>""",
+    html,body,[class*="css"]{{background-color:{BG}!important;color:{TXT}!important;font-family:{FF}!important;letter-spacing:-.01em!important}}
+    .block-container{{padding:1.2rem 2rem 3rem!important;max-width:100%!important;background:transparent!important}}
+    [data-testid="stAppViewContainer"]{{background-color:{BG}!important}}
+    [data-testid="stSidebar"]{{background-color:{CARD}!important;border-right:1px solid {BORD}!important}}
+    #MainMenu,footer,header{{visibility:hidden}}
+    p,span,div,label{{color:{TXT}!important}}
+    .stButton>button{{background:{C2}!important;color:{TXT}!important;border:1px solid {BORD}!important;border-radius:8px!important;font-family:{FF}!important;font-size:12px!important;font-weight:500!important;padding:6px 16px!important;box-shadow:none!important;transition:all .15s!important}}
+    .stButton>button:hover{{border-color:{B5}!important;color:{B5}!important;background:{C3}!important}}
+    </style>""",
     unsafe_allow_html=True
 )
 
 # ════════════════════════════════════════════════════════════════
-# 헬퍼
+# 헬퍼 함수
 # ════════════════════════════════════════════════════════════════
 market = load_pq("market_prices.parquet")
 fred   = load_pq("fred_indicators.parquet")
@@ -146,21 +142,12 @@ def sparkline(df, ind, color=BLUE, days=60, w=72, h=26):
     if mn == mx:
         pts = [(round(i*w/(len(vals)-1),1), h/2) for i in range(len(vals))]
     else:
-        pts = [(round(i*w/(len(vals)-1),1),
-                round(h-mg-(v-mn)/(mx-mn)*(h-mg*2),1)) for i,v in enumerate(vals)]
+        pts = [(round(i*w/(len(vals)-1),1), round(h-mg-(v-mn)/(mx-mn)*(h-mg*2),1)) for i,v in enumerate(vals)]
     ld = "M " + " L ".join(f"{x},{y}" for x,y in pts)
     fd = ld + f" L {pts[-1][0]},{h} L {pts[0][0]},{h} Z"
     gid = "g" + re.sub(r'\W','',ind)[:8]
     lx, ly = pts[-1]
-    return (f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" style="display:block">'
-            f'<defs><linearGradient id="{gid}" x1="0" y1="0" x2="0" y2="1">'
-            f'<stop offset="0%" stop-color="{color}" stop-opacity=".3"/>'
-            f'<stop offset="100%" stop-color="{color}" stop-opacity=".02"/>'
-            f'</linearGradient></defs>'
-            f'<path d="{fd}" fill="url(#{gid})"/>'
-            f'<path d="{ld}" fill="none" stroke="{color}" stroke-width="1.5"'
-            f' stroke-linecap="round" stroke-linejoin="round"/>'
-            f'<circle cx="{lx}" cy="{ly}" r="2.2" fill="{color}"/></svg>')
+    return f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" style="display:block"><defs><linearGradient id="{gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="{color}" stop-opacity=".3"/><stop offset="100%" stop-color="{color}" stop-opacity=".02"/></linearGradient></defs><path d="{fd}" fill="url(#{gid})"/><path d="{ld}" fill="none" stroke="{color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="{lx}" cy="{ly}" r="2.2" fill="{color}"/></svg>'
 
 # ════════════════════════════════════════════════════════════════
 # 헤더
@@ -168,13 +155,10 @@ def sparkline(df, ind, color=BLUE, days=60, w=72, h=26):
 st.markdown(f"""
 <div style="padding:14px 0 12px;border-bottom:1px solid {BORD};margin-bottom:1rem">
   <div style="font-size:26px;font-weight:800;font-style:italic;line-height:1.2;margin-bottom:3px">
-    <span style="background:rgba(56,139,253,.22);padding:2px 10px;border-radius:6px">
-      DY Monitoring
-    </span>
+    <span style="background:rgba(56,139,253,.22);padding:2px 10px;border-radius:6px">DY Monitoring</span>
   </div>
   <div style="font-size:11px;color:{MUT};font-family:'JetBrains Mono',monospace">
-    한미 매크로 · 투자자산 · 일정 · 이슈 종합 대시보드
-    &nbsp;·&nbsp; 매일 KST 07:00 자동수집
+    한미 매크로 · 투자자산 · 일정 · 이슈 종합 대시보드 &nbsp;·&nbsp; 매일 KST 07:00 자동수집
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -196,35 +180,27 @@ for col,(lbl,ind,df_,fmt) in zip(kpi_cols, KPI_ITEMS):
     with col:
         if r is not None:
             st.markdown(f"""
-<div style="background:{CARD};border:1px solid {BORD};border-left:3px solid {BLUE};
-  border-radius:8px;padding:10px 12px 8px">
-  <div style="font-size:9px;color:{MUT};text-transform:uppercase;
-    letter-spacing:.06em;margin-bottom:3px">{lbl}</div>
-  <div style="font-size:17px;font-weight:700;color:{TXT};
-    font-family:'JetBrains Mono',monospace;line-height:1.1">{format(r["value"],fmt)}</div>
-  <div style="font-size:9px;color:{BLUE};font-weight:600;margin:3px 0;
-    font-family:'JetBrains Mono',monospace">{sym}{abs(p):.2f}%</div>
-  <div style="margin-top:4px">{spk}</div>
-</div>""", unsafe_allow_html=True)
+            <div style="background:{CARD};border:1px solid {BORD};border-left:3px solid {BLUE};border-radius:8px;padding:10px 12px 8px">
+              <div style="font-size:9px;color:{MUT};text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">{lbl}</div>
+              <div style="font-size:17px;font-weight:700;color:{TXT};font-family:'JetBrains Mono',monospace;line-height:1.1">{format(r["value"],fmt)}</div>
+              <div style="font-size:9px;color:{BLUE};font-weight:600;margin:3px 0;font-family:'JetBrains Mono',monospace">{sym}{abs(p):.2f}%</div>
+              <div style="margin-top:4px">{spk}</div>
+            </div>""", unsafe_allow_html=True)
         else:
-            st.markdown(f"""
-<div style="background:{CARD};border:1px solid {BORD};border-left:3px solid {BORD};
-  border-radius:8px;padding:10px 12px 8px;opacity:.5">
-  <div style="font-size:9px;color:{MUT};text-transform:uppercase;
-    letter-spacing:.06em;margin-bottom:3px">{lbl}</div>
-  <div style="font-size:17px;font-weight:700;color:{MUT}">—</div>
-</div>""", unsafe_allow_html=True)
+            st.markdown(f'<div style="background:{CARD};border:1px solid {BORD};border-left:3px solid {BORD};border-radius:8px;padding:10px 12px 8px;opacity:.5"><div style="font-size:9px;color:{MUT};text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">{lbl}</div><div style="font-size:17px;font-weight:700;color:{MUT}">—</div></div>', unsafe_allow_html=True)
 
 st.markdown('<div style="height:.8rem"></div>', unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════
-# 브리핑 함수
+# 브리핑 생성 관련 로직
 # ════════════════════════════════════════════════════════════════
 BRIEF_FILE = DATA_DIR / "daily_briefing.json"
 
 def load_brief():
     if BRIEF_FILE.exists():
-        with open(BRIEF_FILE, encoding="utf-8") as f: return json.load(f)
+        try:
+            with open(BRIEF_FILE, encoding="utf-8") as f: return json.load(f)
+        except Exception: return None
     return None
 
 def save_brief(data):
@@ -240,77 +216,65 @@ def build_prompt():
 
     # 시장 지표
     mkt_lines = []
-    for ind, lbl in [("SPX","S&P500"),("NASDAQ","NASDAQ"),("KOSPI","KOSPI"),
-                     ("KOSDAQ","KOSDAQ"),("VIX","VIX"),("USDKRW","USD/KRW"),
-                     ("US_10Y","미국10Y금리")]:
+    for ind, lbl in [("SPX","S&P500"),("NASDAQ","NASDAQ"),("KOSPI","KOSPI"),("KOSDAQ","KOSDAQ"),("VIX","VIX"),("USDKRW","USD/KRW"),("US_10Y","미국10Y금리")]:
         df_src = fred if ind == "US_10Y" else market
         r = lat(df_src, ind)
-        if r is not None:                          # ← FIX: is not None
+        if r is not None:
             _, p = dlt_info(df_src, ind)
             sym = "▲" if p>=0 else "▼"
             mkt_lines.append(f"  {lbl}: {r['value']:,.2f} ({sym}{abs(p):.2f}%)")
 
-    # 보유 종목
-    # FIX: fx_row is a Series → use "is not None" check
+    # 보유 종목 수익률 계산 (방어코드 추가)
     fx_row = lat(market, "USDKRW")
     fx = float(fx_row["value"]) if fx_row is not None else 1380.0
-
     hold_lines = []; tv = 0.0; tp = 0.0
-    for it in portfolio:
-        lots = it.get("lots",[]); ticker = it.get("ticker","")
-        if not lots or not ticker: continue
-        qty  = sum(l["qty"]          for l in lots)
-        cost = sum(l["qty"]*l["price"] for l in lots)
-        avg  = cost/qty if qty>0 else 0
-        sub  = prices[prices["ticker"]==ticker].sort_values("date") \
-               if not prices.empty else pd.DataFrame()
-        if sub.empty: continue
-        cur  = float(sub.iloc[-1]["close"])
-        prev = float(sub.iloc[-2]["close"]) if len(sub)>=2 else cur
-        fxv  = fx if it.get("currency")=="USD" else 1
-        val  = cur*qty*fxv; pnl=(cur-avg)*qty*fxv
-        dpct = (cur/prev-1)*100 if prev else 0
-        tv  += val; tp += pnl
-        sym  = "▲" if dpct>=0 else "▼"
-        hold_lines.append(
-            f"  {it['name']}({it.get('sector','')}) "
-            f"현재:{cur:,.2f} 일간:{sym}{abs(dpct):.2f}% "
-            f"수익률:{(cur/avg-1)*100:+.2f}% 평가:{val:,.0f}원"
-        )
-    pf_sum = (f"  총평가:{tv:,.0f}원  누적손익:{tp:+,.0f}원 "
-              f"({tp/(tv-tp)*100:+.2f}%)") if tv>0 else "  (데이터 없음)"
+    
+    if isinstance(portfolio, list):
+        for it in portfolio:
+            if not isinstance(it, dict): continue
+            lots = [l for l in it.get("lots", []) if isinstance(l, dict)]
+            ticker = it.get("ticker", "")
+            if not lots or not ticker: continue
+            
+            qty  = sum(l.get("qty", 0) for l in lots)
+            cost = sum(l.get("qty", 0) * l.get("price", 0) for l in lots)
+            if qty <= 0: continue
+            avg  = cost/qty
+            
+            sub = prices[prices["ticker"]==ticker].sort_values("date") if not prices.empty else pd.DataFrame()
+            if sub.empty: continue
+            
+            cur  = float(sub.iloc[-1]["close"])
+            prev = float(sub.iloc[-2]["close"]) if len(sub)>=2 else cur
+            fxv  = fx if it.get("currency")=="USD" else 1
+            val  = cur*qty*fxv; pnl=(cur-avg)*qty*fxv
+            dpct = (cur/prev-1)*100 if prev else 0
+            tv  += val; tp += pnl
+            sym  = "▲" if dpct>=0 else "▼"
+            hold_lines.append(f"  {it.get('name','')}({it.get('sector','')}) 현재:{cur:,.2f} 일간:{sym}{abs(dpct):.2f}% 수익률:{(cur/avg-1)*100:+.2f}% 평가:{val:,.0f}원")
+
+    pf_sum = f"  총평가:{tv:,.0f}원  누적손익:{tp:+,.0f}원 ({tp/(tv-tp)*100:+.2f}%)" if tv>0 else "  (데이터 없음)"
 
     # 뉴스
     news_lines = []
     for cat in ("stocks","sectors"):
         for key, arts in news_data.get(cat,{}).items():
-            for n in arts:
-                sc = n.get("score")
-                if sc is not None and (sc>=8 or sc<=2):
-                    tag = "호재" if sc>=6 else "악재"
-                    news_lines.append(
-                        f"  [{tag}{sc}] {key}: "
-                        f"{n.get('ai_summary') or n.get('title','')[:55]}"
-                    )
+            if isinstance(arts, list):
+                for n in arts:
+                    if isinstance(n, dict):
+                        sc = n.get("score")
+                        if sc is not None and (sc>=8 or sc<=2):
+                            tag = "호재" if sc>=6 else "악재"
+                            news_lines.append(f"  [{tag}{sc}] {key}: {n.get('ai_summary') or n.get('title','')[:55]}")
 
     return (
         f"한국 retail 투자자를 위한 실시간 투자 브리핑을 작성하세요.\n\n"
         f"[{now.strftime('%Y-%m-%d %H:%M')} 기준]\n\n"
-        f"▣ 글로벌 시장 지표\n"
-        f"{nl.join(mkt_lines) or '  (데이터 없음)'}\n\n"
-        f"▣ 보유 종목 현황\n"
-        f"{nl.join(hold_lines) or '  (데이터 없음)'}\n"
-        f"{pf_sum}\n\n"
-        f"▣ AI 점수 주요 뉴스\n"
-        f"{nl.join(news_lines[:8]) or '  (뉴스 없음)'}\n\n"
+        f"▣ 글로벌 시장 지표\n{nl.join(mkt_lines) or '  (데이터 없음)'}\n\n"
+        f"▣ 보유 종목 현황\n{nl.join(hold_lines) or '  (데이터 없음)'}\n{pf_sum}\n\n"
+        f"▣ AI 점수 주요 뉴스\n{nl.join(news_lines[:8]) or '  (뉴스 없음)'}\n\n"
         f"다음 JSON만 반환 (다른 텍스트 금지):\n"
-        f'{{"headline":"오늘 핵심 1줄(25자이내)",'
-        f'"market":"시장 분석 2-3문장",'
-        f'"holdings":"보유 종목 분석 2-3문장",'
-        f'"sectors":"보유 섹터 흐름 1-2문장",'
-        f'"news":"주목 뉴스 영향 1-2문장",'
-        f'"action":"투자 액션 코멘트 1문장",'
-        f'"mood":"positive 또는 neutral 또는 cautious"}}'
+        f'{{"headline":"오늘 핵심 1줄(25자이내)","market":"시장 분석 2-3문장","holdings":"보유 종목 분석 2-3문장","sectors":"보유 섹터 흐름 1-2문장","news":"주목 뉴스 영향 1-2문장","action":"투자 액션 코멘트 1문장","mood":"positive 또는 neutral 또는 cautious"}}'
     )
 
 def gen_brief_realtime(api_key):
@@ -335,14 +299,10 @@ def gen_brief_realtime(api_key):
 # 브리핑 UI
 # ════════════════════════════════════════════════════════════════
 brief = load_brief()
-if BRIEF_KEY in st.session_state:
-    brief = st.session_state[BRIEF_KEY]
+if BRIEF_KEY in st.session_state: brief = st.session_state[BRIEF_KEY]
 
 bc1, bc2 = st.columns([5,1])
-with bc1:
-    st.markdown(
-        f'<div style="font-size:16px;font-weight:700;color:{TXT};margin-bottom:.5rem">'
-        f'📡 오늘의 브리핑</div>', unsafe_allow_html=True)
+with bc1: st.markdown(f'<div style="font-size:16px;font-weight:700;color:{TXT};margin-bottom:.5rem">📡 오늘의 브리핑</div>', unsafe_allow_html=True)
 with bc2:
     if st.button("🔄 지금 생성", key="brief_refresh", use_container_width=True):
         api_key = get_secret("ANTHROPIC_API_KEY")
@@ -350,338 +310,4 @@ with bc2:
             st.warning("Streamlit Secrets에 ANTHROPIC_API_KEY를 등록하세요.")
         else:
             with st.spinner("Claude가 브리핑 생성 중…"):
-                nb = gen_brief_realtime(api_key)
-                if nb:
-                    st.session_state[BRIEF_KEY] = nb
-                    save_brief(nb); brief = nb; st.rerun()
-
-if brief:
-    mood_style = {
-        "positive": (B5,"rgba(56,139,253,.15)"),
-        "neutral":  (SUB,C2),
-        "cautious": (B7,"rgba(31,111,235,.15)"),
-    }
-    mc, mbg = mood_style.get(brief.get("mood","neutral"), (SUB,C2))
-    gen_t  = safe(brief.get("generated_at",""))
-    rt_tag = (f'<span style="background:rgba(56,139,253,.2);color:{B5};'
-              f'padding:2px 8px;border-radius:10px;font-size:9px;'
-              f'font-weight:600;font-family:JetBrains Mono">실시간</span>'
-              ) if brief.get("realtime") else ""
-
-    # safe()로 모든 값 HTML 이스케이프 → 구조 깨짐 방지
-    hl    = safe(brief.get("headline",""))
-    mkt   = safe(brief.get("market",""))
-    hold  = safe(brief.get("holdings",""))
-    sect  = safe(brief.get("sectors",""))
-    news_ = safe(brief.get("news",""))
-    act   = safe(brief.get("action",""))
-    mood_ = safe(brief.get("mood","")).upper()
-
-    st.markdown(f"""
-<div style="background:{CARD};border:1px solid {BORD};border-left:4px solid {mc};
-  border-radius:10px;padding:18px 22px;margin-bottom:1rem">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-    <div style="display:flex;align-items:center;gap:8px">
-      <span style="background:{mbg};color:{mc};padding:3px 10px;border-radius:10px;
-        font-size:9px;font-weight:700;font-family:'JetBrains Mono',monospace">
-        {mood_}
-      </span>{rt_tag}
-    </div>
-    <span style="font-size:9px;color:{MUT};font-family:'JetBrains Mono',monospace">
-      {gen_t} 생성
-    </span>
-  </div>
-  <div style="font-size:19px;font-weight:700;color:{TXT};margin-bottom:12px;line-height:1.3">
-    {hl}
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-    <div style="background:{C2};border-radius:7px;padding:11px 14px">
-      <div style="font-size:9px;color:{MUT};text-transform:uppercase;
-        letter-spacing:.06em;margin-bottom:5px">📊 시장</div>
-      <div style="font-size:12px;color:{TXT};line-height:1.6">{mkt}</div>
-    </div>
-    <div style="background:{C2};border-radius:7px;padding:11px 14px">
-      <div style="font-size:9px;color:{MUT};text-transform:uppercase;
-        letter-spacing:.06em;margin-bottom:5px">💼 보유 종목</div>
-      <div style="font-size:12px;color:{TXT};line-height:1.6">{hold}</div>
-    </div>
-    <div style="background:{C2};border-radius:7px;padding:11px 14px">
-      <div style="font-size:9px;color:{MUT};text-transform:uppercase;
-        letter-spacing:.06em;margin-bottom:5px">🏭 섹터</div>
-      <div style="font-size:12px;color:{TXT};line-height:1.6">{sect}</div>
-    </div>
-    <div style="background:{C2};border-radius:7px;padding:11px 14px">
-      <div style="font-size:9px;color:{MUT};text-transform:uppercase;
-        letter-spacing:.06em;margin-bottom:5px">📰 뉴스</div>
-      <div style="font-size:12px;color:{TXT};line-height:1.6">{news_}</div>
-    </div>
-  </div>
-  <div style="background:rgba(56,139,253,.08);border:1px solid rgba(56,139,253,.2);
-    border-radius:7px;padding:11px 14px;font-size:12px;color:{BLUE};font-weight:600">
-    💬 {act}
-  </div>
-</div>""", unsafe_allow_html=True)
-else:
-    st.markdown(f"""
-<div style="background:{CARD};border:1px solid {BORD};border-radius:10px;
-  padding:30px;text-align:center;margin-bottom:1rem">
-  <div style="font-size:14px;color:{SUB}">
-    브리핑 없음 — 🔄 버튼으로 생성하거나 GitHub Actions를 실행하세요
-  </div>
-</div>""", unsafe_allow_html=True)
-
-# ════════════════════════════════════════════════════════════════
-# 보유 종목 차트
-# ════════════════════════════════════════════════════════════════
-portfolio = load_json("portfolio.json", [])
-prices_df = load_pq("portfolio_prices.parquet")
-
-@st.cache_data(ttl=300)
-def fetch_intraday_yf(ticker, currency):
-    try:
-        import yfinance as yf
-        t    = yf.Ticker(ticker)
-        hist = t.history(period="1d" if currency=="USD" else "7d",
-                         interval="5m" if currency=="USD" else "1h")
-        if hist.empty: return pd.DataFrame()
-        hist.index = pd.to_datetime(hist.index)
-        return (hist.reset_index()[["Datetime","Close"]]
-                .rename(columns={"Datetime":"date","Close":"close"}))
-    except: return pd.DataFrame()
-
-def get_price_series(item):
-    ticker   = item.get("ticker","")
-    currency = item.get("currency","KRW")
-    df = fetch_intraday_yf(ticker, currency)
-    if not df.empty:
-        df["source"] = "realtime"; return df
-    if not prices_df.empty:
-        sub = prices_df[prices_df["ticker"]==ticker].sort_values("date").tail(30).copy()
-        if not sub.empty:
-            sub["source"] = "daily"; return sub[["date","close","source"]]
-    return pd.DataFrame()
-
-if portfolio:
-    st.markdown(
-        f'<div style="font-size:16px;font-weight:700;color:{TXT};margin-bottom:.6rem">'
-        f'📈 보유 종목 현황</div>', unsafe_allow_html=True)
-
-    # FIX: fx_row is Series → use "is not None"
-    fx_row = lat(market, "USDKRW")
-    fx = float(fx_row["value"]) if fx_row is not None else 1380.0
-
-    items_with_lots = [p for p in portfolio if p.get("lots")]
-    ncols = min(3, len(items_with_lots)) if items_with_lots else 1
-
-    chart_cols = st.columns(ncols)
-    for i, item in enumerate(items_with_lots):
-        ticker   = item.get("ticker","")
-        currency = item.get("currency","KRW")
-        name     = item.get("name","")
-        lots     = item.get("lots",[])
-        qty      = sum(l["qty"]            for l in lots)
-        cost     = sum(l["qty"]*l["price"] for l in lots)
-        avg      = cost/qty if qty>0 else 0
-        fxv      = fx if currency=="USD" else 1
-
-        df_p      = get_price_series(item)
-        cur_price = float(df_p["close"].iloc[-1])  if not df_p.empty else None
-        source    = str(df_p["source"].iloc[-1])   if (not df_p.empty and "source" in df_p.columns) else "daily"
-
-        daily_pct = 0.0
-        if cur_price and len(df_p) >= 2:
-            prev = float(df_p["close"].iloc[-2])
-            daily_pct = (cur_price/prev-1)*100 if prev else 0.0
-
-        pnl_pct = (cur_price/avg-1)*100 if (avg>0 and cur_price) else 0.0
-        val_krw = cur_price*qty*fxv if cur_price else 0
-        clr_d   = UP if daily_pct>=0 else DN
-        clr_p   = UP if pnl_pct>=0   else DN
-
-        with chart_cols[i % ncols]:
-            st.markdown(f"""
-<div style="background:{CARD};border:1px solid {BORD};border-radius:10px 10px 0 0;
-  padding:12px 14px 8px">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;
-    margin-bottom:6px">
-    <div>
-      <div style="font-size:13px;font-weight:700;color:{TXT}">{safe(name)}</div>
-      <div style="font-size:9px;color:{MUT};font-family:'JetBrains Mono',monospace">
-        {safe(ticker)}</div>
-    </div>
-    <div style="text-align:right">
-      <div style="font-size:14px;font-weight:700;color:{TXT};
-        font-family:'JetBrains Mono',monospace">
-        {f"{cur_price:,.2f}" if cur_price else "—"}
-        <span style="font-size:9px;color:{MUT}">{safe(currency)}</span>
-      </div>
-      <div style="font-size:9px;color:{clr_d};font-weight:600;
-        font-family:'JetBrains Mono',monospace">
-        {"▲" if daily_pct>=0 else "▼"}{abs(daily_pct):.2f}% 일간
-      </div>
-    </div>
-  </div>
-  <div style="display:flex;gap:12px;font-size:10px;
-    font-family:'JetBrains Mono',monospace">
-    <span style="color:{MUT}">수량 <b style="color:{TXT}">{qty:,.0f}</b></span>
-    <span style="color:{MUT}">평단 <b style="color:{TXT}">{avg:,.2f}</b></span>
-    <span style="color:{clr_p}">수익률
-      <b>{"▲" if pnl_pct>=0 else "▼"}{abs(pnl_pct):.2f}%</b>
-    </span>
-    <span style="color:{MUT}">평가
-      <b style="color:{TXT}">{val_krw/1e6:.1f}M</b>원
-    </span>
-  </div>
-</div>""", unsafe_allow_html=True)
-
-            if not df_p.empty and len(df_p) >= 3:
-                yr  = [df_p["close"].min()*0.99, df_p["close"].max()*1.01]
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=df_p["date"], y=df_p["close"],
-                    line=dict(color=BLUE,width=2),
-                    fill="tozeroy", fillcolor="rgba(56,139,253,.08)",
-                    hovertemplate=f"<b>{safe(name)}</b> %{{y:,.2f}}<extra></extra>"))
-                if avg > 0:
-                    fig.add_hline(y=avg, line_dash="dot", line_color=GOLD, line_width=1,
-                        annotation_text=f"평단 {avg:,.2f}",
-                        annotation_font_color=GOLD, annotation_font_size=9)
-                fig.update_layout(
-                    paper_bgcolor=CARD, plot_bgcolor=CARD,
-                    height=180, margin=dict(l=0,r=0,t=0,b=0),
-                    showlegend=False, hovermode="x unified",
-                    hoverlabel=dict(bgcolor=C2,bordercolor=BORD,
-                        font=dict(family="JetBrains Mono",size=10,color=TXT)),
-                    xaxis=dict(showgrid=False,zeroline=False,showline=False,
-                        tickfont=dict(size=8,color=MUT)),
-                    yaxis=dict(showgrid=True,gridcolor=G,zeroline=False,
-                        showline=False,tickfont=dict(size=8,color=MUT),
-                        range=yr,side="right"))
-                st.plotly_chart(fig,use_container_width=True,
-                                config={"displayModeBar":False})
-            else:
-                st.markdown(f"""
-<div style="background:{C2};height:100px;display:flex;align-items:center;
-  justify-content:center;font-size:10px;color:{MUT}">
-  Actions 실행 후 표시됩니다</div>""", unsafe_allow_html=True)
-
-            st.markdown(f"""
-<div style="background:{C2};border:1px solid {BORD};border-top:none;
-  border-radius:0 0 10px 10px;padding:5px 14px;
-  font-size:9px;color:{MUT};font-family:'JetBrains Mono',monospace">
-  {"실시간" if source=="realtime" else "일별"} ·
-  {now.strftime("%Y-%m-%d %H:%M")} 기준
-</div>""", unsafe_allow_html=True)
-
-        if (i+1) % ncols == 0 and (i+1) < len(items_with_lots):
-            st.markdown('<div style="height:.6rem"></div>', unsafe_allow_html=True)
-            chart_cols = st.columns(ncols)
-
-# ════════════════════════════════════════════════════════════════
-# 주간 리포트
-# ════════════════════════════════════════════════════════════════
-weekly = load_json("weekly_report.json", None)
-if weekly and isinstance(weekly, dict) and weekly.get("headline"):
-    grade = weekly.get("grade","B")
-    gc = {"S":UP,"A":B5,"B":BLUE,"C":SUB,"D":DN}.get(grade, SUB)
-    st.markdown(f"""
-<div style="height:.6rem"></div>
-<details style="background:{CARD};border:1px solid {BORD};border-radius:10px;
-  padding:14px 18px;cursor:pointer">
-  <summary style="font-size:13px;font-weight:700;color:{TXT};list-style:none;
-    display:flex;align-items:center;gap:8px">
-    📊 주간 리포트
-    <span style="background:rgba(56,139,253,.15);color:{gc};padding:2px 9px;
-      border-radius:10px;font-size:10px;font-weight:700">{safe(grade)}</span>
-    <span style="font-size:12px;color:{TXT};font-weight:600">
-      {safe(weekly.get("headline",""))}</span>
-    <span style="font-size:9px;color:{MUT};margin-left:auto;
-      font-family:'JetBrains Mono',monospace">
-      {safe(weekly.get("week_range",""))} · {safe(weekly.get("generated_at",""))} 생성
-    </span>
-  </summary>
-  <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-    <div style="background:{C2};border-radius:7px;padding:10px 13px">
-      <div style="font-size:9px;color:{MUT};margin-bottom:4px">성과</div>
-      <div style="font-size:11px;color:{TXT};line-height:1.6">
-        {safe(weekly.get("performance",""))}</div>
-    </div>
-    <div style="background:{C2};border-radius:7px;padding:10px 13px">
-      <div style="font-size:9px;color:{MUT};margin-bottom:4px">시장 환경</div>
-      <div style="font-size:11px;color:{TXT};line-height:1.6">
-        {safe(weekly.get("market_context",""))}</div>
-    </div>
-    <div style="background:{C2};border-radius:7px;padding:10px 13px">
-      <div style="font-size:9px;color:{MUT};margin-bottom:4px">교훈</div>
-      <div style="font-size:11px;color:{TXT};line-height:1.6">
-        {safe(weekly.get("lessons",""))}</div>
-    </div>
-    <div style="background:{C2};border-radius:7px;padding:10px 13px">
-      <div style="font-size:9px;color:{MUT};margin-bottom:4px">다음 주 주목</div>
-      <div style="font-size:11px;color:{TXT};line-height:1.6">
-        {safe(weekly.get("next_week",""))}</div>
-    </div>
-  </div>
-</details>""", unsafe_allow_html=True)
-
-# ════════════════════════════════════════════════════════════════
-# 다가오는 일정 (events.json) — 미니 위젯
-# ════════════════════════════════════════════════════════════════
-_events_raw = load_json("events.json", {})
-_events = _events_raw.get("events", []) if isinstance(_events_raw, dict) else []
-_EV_STYLE = {
-    "fomc":     (UP,   "🏛"),   # 한국 관례: 상승=빨강이지만 일정 강조용으로 재사용
-    "cpi":      (GOLD, "📊"),
-    "bok":      (B5,   "🇰🇷"),
-    "earnings": (PUR_DK, "💵"),
-    "custom":   (SUB,  "📌"),
-}
-_today = now.date()
-_upcoming = []
-for _e in _events:
-    try:
-        _d = datetime.strptime(_e["date"], "%Y-%m-%d").date()
-    except Exception:
-        continue
-    if _d >= _today:
-        _upcoming.append((_d, _e))
-_upcoming.sort(key=lambda x: x[0])
-_upcoming = _upcoming[:4]
-
-if _upcoming:
-    st.markdown(
-        f'<div style="font-size:16px;font-weight:700;color:{TXT};'
-        f'margin:1.6rem 0 .6rem">⏰ 다가오는 일정</div>',
-        unsafe_allow_html=True)
-    _ev_cols = st.columns(len(_upcoming))
-    for _col, (_d, _e) in zip(_ev_cols, _upcoming):
-        _clr, _icon = _EV_STYLE.get(_e.get("type", "custom"), _EV_STYLE["custom"])
-        _dday = (_d - _today).days
-        _dlabel = "D-DAY" if _dday == 0 else f"D-{_dday}"
-        with _col:
-            st.markdown(f"""
-<div style="background:{CARD};border:1px solid {BORD};border-left:3px solid {_clr};
-  border-radius:9px;padding:12px 14px">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-    <span style="font-size:16px">{_icon}</span>
-    <span style="background:{_clr}22;color:{_clr};padding:2px 9px;border-radius:10px;
-      font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace">{_dlabel}</span>
-  </div>
-  <div style="font-size:12px;font-weight:700;color:{TXT};margin-bottom:3px">
-    {safe(_e.get("title",""))}</div>
-  <div style="font-size:9px;color:{MUT};font-family:'JetBrains Mono',monospace">
-    {_d.strftime("%Y-%m-%d")} · {safe(_e.get("time",""))}</div>
-</div>""", unsafe_allow_html=True)
-
-# ════════════════════════════════════════════════════════════════
-# 푸터
-# ════════════════════════════════════════════════════════════════
-st.markdown(f"""
-<div style="margin-top:2rem;padding:10px 16px;background:{C2};
-  border:1px solid {BORD};border-radius:8px;font-size:10px;color:{MUT};
-  font-family:'JetBrains Mono',monospace;
-  display:flex;justify-content:space-between;align-items:center">
-  <span>📅 매일 KST 07:00 · FRED · yfinance · CNN F&amp;G · ECOS · 네이버 · DART</span>
-  <span>{now.strftime("%Y-%m-%d %H:%M")} KST</span>
-</div>
-""", unsafe_allow_html=True)
+                nb
