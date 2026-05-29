@@ -500,6 +500,11 @@ def render_risk_tab(positions, prices, mdf):
 # 5. 메인 앱 실행 흐름
 # ════════════════════════════════════════════════════════════════
 def main():
+    # ★★★ 방어 코드: 세션 상태(Session State)가 꼬이는 것을 방지하기 위해 
+    # 앱 메인 흐름이 시작되는 가장 첫 부분에 초기화 코드를 배치합니다.
+    if "chart_range" not in st.session_state:
+        st.session_state.chart_range = "3M"
+
     render_css()
     render_sidebar_helper()
 
@@ -631,9 +636,7 @@ def main():
     with right:
         _, rng_col = st.columns([1, 5])
         with rng_col:
-            if "chart_range" not in st.session_state:
-                st.session_state.chart_range = "3M"
-
+            # st.session_state 설정이 메인 함수 최상단으로 옮겨졌으므로 여기선 바로 사용
             rng = st.radio("기간", ["1W", "1M", "3M", "6M", "1Y", "YTD", "ALL"], horizontal=True, label_visibility="collapsed", key="rng")
             if rng != st.session_state.chart_range:
                 st.session_state.chart_range = rng
