@@ -1,0 +1,8 @@
+{
+  "groups": [
+    {"name": "내 관심종목", "tickers": [
+      {"name": "팔란티어", "ticker": "PLTR", "currency": "USD"},
+      {"name": "한화에어로", "ticker": "012450.KS", "currency": "KRW"}
+    ]}
+  ]
+}
