@@ -1,8 +1,53 @@
 {
+  "_comment": "관심종목을 직접 추가/수정하세요. ticker는 yfinance 형식 (한국: 005930.KS, 코스닥: 247540.KQ, 미국: NVDA)",
   "groups": [
-    {"name": "내 관심종목", "tickers": [
-      {"name": "팔란티어", "ticker": "PLTR", "currency": "USD"},
-      {"name": "한화에어로", "ticker": "012450.KS", "currency": "KRW"}
-    ]}
+    {
+      "name": "🇺🇸 Magnificent 7",
+      "region": "US",
+      "tickers": [
+        {"name": "엔비디아", "ticker": "NVDA"},
+        {"name": "애플", "ticker": "AAPL"},
+        {"name": "마이크로소프트", "ticker": "MSFT"},
+        {"name": "알파벳", "ticker": "GOOGL"},
+        {"name": "아마존", "ticker": "AMZN"},
+        {"name": "메타", "ticker": "META"},
+        {"name": "테슬라", "ticker": "TSLA"}
+      ]
+    },
+    {
+      "name": "🇺🇸 반도체",
+      "region": "US",
+      "tickers": [
+        {"name": "AMD", "ticker": "AMD"},
+        {"name": "브로드컴", "ticker": "AVGO"},
+        {"name": "마이크론", "ticker": "MU"},
+        {"name": "TSMC", "ticker": "TSM"},
+        {"name": "ASML", "ticker": "ASML"},
+        {"name": "AppliedMat", "ticker": "AMAT"}
+      ]
+    },
+    {
+      "name": "🇰🇷 시총 상위",
+      "region": "KR",
+      "tickers": [
+        {"name": "삼성전자", "ticker": "005930.KS"},
+        {"name": "SK하이닉스", "ticker": "000660.KS"},
+        {"name": "LG에너지솔루션", "ticker": "373220.KS"},
+        {"name": "삼성바이오로직스", "ticker": "207940.KS"},
+        {"name": "현대차", "ticker": "005380.KS"},
+        {"name": "기아", "ticker": "000270.KS"}
+      ]
+    },
+    {
+      "name": "🇰🇷 내 포트폴리오 섹터 (방산·증권·우주·로봇)",
+      "region": "KR",
+      "tickers": [
+        {"name": "한화에어로스페이스", "ticker": "012450.KS"},
+        {"name": "현대로템", "ticker": "064350.KS"},
+        {"name": "한국항공우주", "ticker": "047810.KS"},
+        {"name": "키움증권", "ticker": "039490.KS"},
+        {"name": "레인보우로보틱스", "ticker": "277810.KQ"}
+      ]
+    }
   ]
 }
