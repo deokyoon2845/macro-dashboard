@@ -1,0 +1,12 @@
+{
+  "_comment": "일정을 직접 추가/수정하세요. type: fomc / cpi / bok / earnings / custom",
+  "events": [
+    {"date": "2026-06-17", "title": "FOMC 금리결정", "type": "fomc", "time": "익일 03:00 KST", "note": "점도표 포함"},
+    {"date": "2026-07-29", "title": "FOMC 금리결정", "type": "fomc", "time": "익일 03:00 KST"},
+    {"date": "2026-09-16", "title": "FOMC 금리결정", "type": "fomc", "time": "익일 03:00 KST", "note": "점도표 포함"},
+    {"date": "2026-10-28", "title": "FOMC 금리결정", "type": "fomc", "time": "익일 03:00 KST"},
+    {"date": "2026-12-09", "title": "FOMC 금리결정", "type": "fomc", "time": "익일 03:00 KST", "note": "점도표 포함"},
+    {"date": "2026-06-11", "title": "한국 금통위 (예시·확인필요)", "type": "bok", "time": "10:00 KST"},
+    {"date": "2026-06-10", "title": "미국 5월 CPI (예시·확인필요)", "type": "cpi", "time": "21:30 KST"}
+  ]
+}
