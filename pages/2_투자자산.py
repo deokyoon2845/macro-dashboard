@@ -631,10 +631,13 @@ def main():
     with right:
         _, rng_col = st.columns([1, 5])
         with rng_col:
+            if "chart_range" not in st.session_state:
+                st.session_state.chart_range = "3M"
+
             rng = st.radio("기간", ["1W", "1M", "3M", "6M", "1Y", "YTD", "ALL"], horizontal=True, label_visibility="collapsed", key="rng")
             if rng != st.session_state.chart_range:
                 st.session_state.chart_range = rng
-
+                
         filtered = filter_hist(hist_df, st.session_state.chart_range)
         if not filtered.empty:
             fig = make_subplots(specs=[[{"secondary_y": True}]])
