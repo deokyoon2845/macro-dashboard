@@ -328,242 +328,11 @@ def render_management_form(portfolio):
                 save_portfolio(portfolio)
                 st.cache_data.clear(); st.rerun()
 
-def render_ticker_bar(positions):
-    if not positions: return
-    ticker_items = ""
-    for i, pos in enumerate(sorted(positions, key=lambda x: x.get("value_krw", 0), reverse=True)[:8]):
-        clr = HOLD_COLORS[i % len(HOLD_COLORS)]
-        pct, pclr = pos.get("daily_pct", 0), UP if pos.get("daily_pct", 0) >= 0 else DN
-        sign = "+" if pct >= 0 else ""
-        val_str = f"{pos['value_krw']/1e8:.2f}억" if pos["value_krw"] >= 1e8 else f"{pos['value_krw']/1e4:.0f}만"
-        
-        ticker_items += f"""
-        <div style="display:flex;flex-direction:column;gap:3px;padding:10px 16px;background:{CARD};border:1px solid {BORD};border-radius:8px;min-width:160px;flex-shrink:0">
-            <div style="display:flex;align-items:center;gap:6px">
-                <span style="width:8px;height:8px;border-radius:50%;background:{clr};flex-shrink:0"></span>
-                <span style="font-size:11px;font-weight:600;color:{TXT};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px">{pos['name']}</span>
-            </div>
-            <div style="display:flex;align-items:baseline;justify-content:space-between">
-                <span style="font-size:13px;font-weight:700;color:{TXT};font-family:'JetBrains Mono',monospace">{val_str}</span>
-                <span style="font-size:11px;font-weight:600;color:{pclr};font-family:'JetBrains Mono',monospace">{sign}{pct:.2f}%</span>
-            </div>
-        </div>"""
-        
-    st.markdown(f'<div style="display:flex;gap:8px;overflow-x:auto;padding:4px 0 12px;scrollbar-width:thin;scrollbar-color:{BORD} transparent">{ticker_items}</div>', unsafe_allow_html=True)
+render_ticker_bar(positions)
 
-def news_card_new(news, accent=B5):
-    title = news.get("title", ""); url = news.get("url", "#")
-    body = news.get("ai_summary") or news.get("summary", "")
-    source = (news.get("source") or "")[:25]; pub = news.get("pub_date", "")
-    score = news.get("score"); tags = news.get("tags", [])
-    try: ds = datetime.fromisoformat(pub.replace("Z", "+00:00").split("+")[0]).strftime("%m-%d")
-    except: ds = pub[:5] if pub else ""
-    badge = ""
-    if score is not None:
-        if score >= 7: bf, bb = "호재", "rgba(226,75,74,.2)"
-        elif score <= 3: bf, bb = "악재", "rgba(56,139,253,.2)"
-        else: bf, bb = "중립", "rgba(56,139,253,.15)"
-        bclr = UP if score >= 7 else (DN if score <= 3 else B5)
-        badge = f'<span style="background:{bb};color:{bclr};padding:2px 7px;border-radius:12px;font-size:9px;font-weight:600;font-family:JetBrains Mono">{bf} {score}</span>'
-    tag_html = "".join(f'<span style="background:{C3};color:{SUB};padding:1px 6px;border-radius:4px;font-size:9px;font-family:JetBrains Mono">#{t}</span>' for t in tags[:2]) if tags else ""
-    return f"""<a href="{url}" target="_blank" style="text-decoration:none">
-    <div style="background:{CARD};border:1px solid {BORD};border-left:3px solid {accent};border-radius:8px;padding:14px;height:190px;display:flex;flex-direction:column">
-      <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:8px">
-        <div style="font-size:12px;font-weight:600;color:{TXT};line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;flex:1">{title}</div>
-        {badge}
-      </div>
-      <div style="font-size:11px;color:{SUB};line-height:1.5;flex:1;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical">{body}</div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid {BORD}">
-        <div style="display:flex;gap:4px">{tag_html}</div>
-        <div style="display:flex;gap:8px;font-size:9px;color:{MUT};font-family:JetBrains Mono"><span>{source}</span><span>{ds}</span></div>
-      </div>
-    </div></a>"""
-
-def disc_card_new(d):
-    title = d.get("title", ""); url = d.get("url", "#"); filer = d.get("filer", "")
-    dt = d.get("date", "")
-    if len(dt) == 8: dt = f"{dt[4:6]}-{dt[6:8]}"
-    return f"""<a href="{url}" target="_blank" style="text-decoration:none">
-    <div style="background:{CARD};border:1px solid {BORD};border-left:3px solid {B7};border-radius:8px;padding:14px;min-height:90px;display:flex;flex-direction:column;justify-content:space-between">
-      <div style="font-size:12px;font-weight:600;color:{TXT};line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical">{title}</div>
-      <div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid {BORD};font-size:9px;color:{MUT};font-family:JetBrains Mono"><span>{filer}</span><span>{dt}</span></div>
-    </div></a>"""
-
-def render_risk_tab(positions, prices, mdf):
-    if prices.empty or len(positions) < 2:
-        st.markdown(f'<div style="background:{CARD};border:1px solid {BORD};border-radius:12px;padding:40px;text-align:center"><div style="font-size:14px;color:{SUB}">종목이 2개 이상 등록되고 가격 데이터가 수집된 후 확인 가능합니다</div></div>', unsafe_allow_html=True)
-        return
-
-    st.markdown(f'<div style="font-size:14px;font-weight:600;color:{SUB};margin:1rem 0 10px">리스크 지표 요약</div>', unsafe_allow_html=True)
-    
-    risk_rows = ""
-    for i, pos in enumerate(sorted(positions, key=lambda x: x.get("value_krw", 0), reverse=True)):
-        clr = HOLD_COLORS[i % len(HOLD_COLORS)]
-        t = pos["ticker"]
-        is_usd = pos["currency"] == "USD"
-        
-        beta = calc_beta(t, is_usd, prices, mdf)
-        vol = calc_vol(t, prices)
-        mdd_v = calc_mdd(t, prices)
-        sh = calc_sharpe(t, prices)
-        
-        b_html = get_badge_html(beta, (0.8, 1.3), "{:.2f}")
-        v_html = get_badge_html(vol, (20, 35), "{:.1f}%", reverse=True)
-        m_html = f'<span style="color:{DN};font-weight:700;font-family:JetBrains Mono">{mdd_v:.1f}%</span>' if mdd_v else f'<span style="color:{MUT}">—</span>'
-        sh_html = get_badge_html(sh, (0, 1), "{:.2f}")
-        
-        risk_rows += f"""
-        <tr style="border-bottom:1px solid {BORD}">
-            <td style="padding:.7rem 1rem">
-                <div style="display:flex;align-items:center;gap:8px">
-                    <span style="width:8px;height:8px;border-radius:50%;background:{clr};flex-shrink:0"></span>
-                    <div>
-                        <div style="font-size:12px;font-weight:600;color:{TXT}">{pos['name']}</div>
-                        <div style="font-size:9px;color:{MUT};font-family:'JetBrains Mono',monospace">{t}</div>
-                    </div>
-                </div>
-            </td>
-            <td style="padding:.7rem 1rem;text-align:center">{b_html}</td>
-            <td style="padding:.7rem 1rem;text-align:center">{v_html}</td>
-            <td style="padding:.7rem 1rem;text-align:center">{m_html}</td>
-            <td style="padding:.7rem 1rem;text-align:center">{sh_html}</td>
-        </tr>"""
-
-    TH_S = f"padding:.6rem 1rem;font-size:10px;color:{MUT};font-weight:500;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid {BORD};text-align:center"
-    st.markdown(f"""
-    <div style="background:{CARD};border:1px solid {BORD};border-radius:12px;overflow:hidden">
-        <table style="width:100%;border-collapse:collapse">
-            <thead>
-                <tr style="background:{C2}">
-                    <th style="{TH_S};text-align:left">종목</th>
-                    <th style="{TH_S}">베타<br><span style="font-size:8px;color:{MUT};font-weight:400">90일</span></th>
-                    <th style="{TH_S}">변동성<br><span style="font-size:8px;color:{MUT};font-weight:400">60일·연환산</span></th>
-                    <th style="{TH_S}">MDD<br><span style="font-size:8px;color:{MUT};font-weight:400">최대낙폭</span></th>
-                    <th style="{TH_S}">샤프비율<br><span style="font-size:8px;color:{MUT};font-weight:400">90일</span></th>
-                </tr>
-            </thead>
-            <tbody>{risk_rows}</tbody>
-        </table>
-    </div>
-    <div style="background:{C2};border:1px solid {BORD};border-radius:8px;padding:10px 14px;font-size:10px;color:{SUB};margin-top:8px;display:flex;gap:16px;flex-wrap:wrap">
-        <span>📊 <b style="color:{TXT}">베타</b> &lt;0.8 방어 · 0.8~1.3 중립 · &gt;1.3 공격</span>
-        <span>📉 <b style="color:{TXT}">변동성</b> &lt;20% 안정 · 20~35% 보통 · &gt;35% 고위험</span>
-        <span>⭐ <b style="color:{TXT}">샤프</b> &lt;0 손실 · 0~1 보통 · &gt;1 우수</span>
-    </div><div style="height:1.5rem"></div>""", unsafe_allow_html=True)
-
-    # ── 상관관계 매트릭스 ─────────────────────────────────
-    st.markdown('<div style="font-size:14px;font-weight:600;color:{SUB};margin-bottom:10px">상관관계 매트릭스</div>', unsafe_allow_html=True)
-    all_tickers = [p["ticker"] for p in positions]
-    names_map = {p["ticker"]: p["name"] for p in positions}
-    
-    pivot = prices[prices["ticker"].isin(all_tickers)].pivot_table(index="date", columns="ticker", values="close")
-    ret_mat = pivot.pct_change().dropna()
-
-    if len(ret_mat.columns) >= 2 and len(ret_mat) >= 10:
-        corr = ret_mat.corr()
-        corr.columns = [names_map.get(t, t) for t in corr.columns]
-        corr.index = [names_map.get(t, t) for t in corr.index]
-        
-        fig_c = go.Figure(go.Heatmap(
-            z=corr.values, x=list(corr.columns), y=list(corr.index),
-            colorscale=[[0, "#1F6FEB"], [0.5, CARD], [1, "#E24B4A"]],
-            zmin=-1, zmax=1,
-            text=[[f"{v:.2f}" for v in row] for row in corr.values],
-            texttemplate="%{text}",
-            textfont={"size": 11, "color": TXT, "family": "JetBrains Mono"},
-            colorbar=dict(thickness=10, tickfont=dict(color=MUT, size=9), bgcolor="rgba(0,0,0,0)")
-        ))
-        fig_c.update_layout(
-            paper_bgcolor=CARD, plot_bgcolor=CARD, height=max(280, len(corr)*60), margin=dict(l=8, r=60, t=8, b=8),
-            font=dict(family="JetBrains Mono", size=10, color=MUT),
-            xaxis=dict(tickfont=dict(size=10, color=TXT), tickangle=-30), yaxis=dict(tickfont=dict(size=10, color=TXT))
-        )
-        st.plotly_chart(fig_c, use_container_width=True)
-
-    # ── 롤링 변동성 추이 ─────────────────────────────────
-    st.markdown('<div style="font-size:14px;font-weight:600;color:{SUB};margin-bottom:10px">롤링 변동성 추이 (30일 연환산)</div>', unsafe_allow_html=True)
-    fig_v = go.Figure()
-    for i, pos in enumerate(positions):
-        sub = prices[prices["ticker"]==pos["ticker"]].sort_values("date").copy()
-        if len(sub) < 35: continue
-        sub["ret"] = sub["close"].pct_change()
-        sub["vol"] = sub["ret"].rolling(30).std() * np.sqrt(252) * 100
-        sub = sub.dropna(subset=["vol"])
-        if sub.empty: continue
-        fig_v.add_trace(go.Scatter(x=sub["date"], y=sub["vol"], name=pos["name"], line=dict(color=HOLD_COLORS[i%len(HOLD_COLORS)], width=2)))
-        
-    fig_v.add_hline(y=20, line_dash="dash", line_color=SUB, line_width=1, annotation_text="20% 경계", annotation_font_color=SUB, annotation_font_size=9)
-    fig_v.update_layout(paper_bgcolor=CARD, plot_bgcolor=CARD, height=260, margin=dict(l=8, r=8, t=8, b=8), legend=dict(orientation="h", y=1.1, x=0, font=dict(size=10, color=SUB)), hovermode="x unified", xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor=G, ticksuffix="%"))
-    st.plotly_chart(fig_v, use_container_width=True)
-
-# ════════════════════════════════════════════════════════════════
-# 5. 메인 앱 실행 흐름
-# ════════════════════════════════════════════════════════════════
-def main():
-    # ★★★ 방어 코드: 세션 상태(Session State)가 꼬이는 것을 방지하기 위해 
-    # 앱 메인 흐름이 시작되는 가장 첫 부분에 초기화 코드를 배치합니다.
-    if "chart_range" not in st.session_state:
-        st.session_state.chart_range = "3M"
-
-    render_css()
-    render_sidebar_helper()
-
-    portfolio = load_portfolio()
-    if not isinstance(portfolio, list):
-        portfolio = []
-
-    prices = load_parquet(PRICE_FILE)
-    mdf = load_parquet(MARKET_FILE)
-    usdkrw = get_usdkrw(mdf)
-
-    # 모든 리스트 항목 내부 딕셔너리 검증용 이중 방어 필터링
-    positions_all = [compute_pos(p, prices, usdkrw) for p in portfolio if isinstance(p, dict)]
-    positions_all = [p for p in positions_all if p is not None]
-
-    accts_in_use = sorted({p["account"] for p in positions_all}) if positions_all else []
-    acct_tabs = ["📊 전체"] + [ACCT_LABELS.get(a, a) for a in accts_in_use]
-    rev_labels = {v: k for k, v in ACCT_LABELS.items()}
-
-    sel_idx = st.radio("계좌 선택", acct_tabs, horizontal=True, label_visibility="collapsed", key="acct_radio")
-    sel_account = None if sel_idx == "📊 전체" else rev_labels.get(sel_idx, sel_idx)
-
-    portfolio_view = portfolio if sel_account is None else [p for p in portfolio if isinstance(p, dict) and p.get("account", "일반") == sel_account]
-    positions = [p for p in positions_all] if sel_account is None else [p for p in positions_all if p["account"] == sel_account]
-
-    # 상단 요약 카드 (전체보기 전용)
-    if sel_account is None and accts_in_use:
-        acct_cols = st.columns(len(accts_in_use))
-        for col, acct in zip(acct_cols, accts_in_use):
-            clr = ACCT_COLORS.get(acct, B5)
-            holds = [p for p in positions_all if p["account"] == acct]
-            a_val = sum(p["value_krw"] for p in holds)
-            a_pnl = sum(p["pnl_krw"] for p in holds)
-            a_pct = (a_pnl / sum(p["cost_krw"] for p in holds) * 100) if sum(p.get("cost_krw", 0) for p in holds) > 0 else 0
-            pclr = UP if a_pnl >= 0 else DN
-            sym = "▲" if a_pnl >= 0 else "▼"
-            with col:
-                st.markdown(f"""
-                <div style="background:{CARD};border:1px solid {BORD};border-top:3px solid {clr};border-radius:9px;padding:13px 15px;margin-bottom:10px">
-                  <div style="font-size:10px;color:{SUB};margin-bottom:4px">{ACCT_LABELS.get(acct,acct)}</div>
-                  <div style="font-size:20px;font-weight:800;color:{TXT};font-family:'JetBrains Mono',monospace">{a_val/1e6:.1f}<span style="font-size:11px;color:{MUT}">백만원</span></div>
-                  <div style="font-size:10px;color:{pclr};font-weight:600;font-family:'JetBrains Mono',monospace;margin-top:3px">{sym}{abs(a_pnl):,.0f}원 ({a_pct:+.2f}%)</div>
-                  <div style="font-size:10px;color:{MUT};margin-top:2px">{len(holds)}개 종목</div>
-                </div>""", unsafe_allow_html=True)
-
-    h1, h2 = st.columns([4, 1])
-    with h1:
-        acct_label = ACCT_LABELS.get(sel_account, "") if sel_account else ""
-        st.markdown(f'<div style="padding:16px 0 10px"><div style="font-size:12px;color:{SUB};font-weight:500;text-transform:uppercase;margin-bottom:4px">포트폴리오 {f"· {acct_label}" if acct_label else ""}</div><div style="font-size:26px;font-weight:700;color:{TXT}">투자자산 현황</div></div>', unsafe_allow_html=True)
-    with h2:
-        render_management_form(portfolio)
-
-    render_ticker_bar(positions)
-
-# ── [수정된 부분 시작] ───────────────────────────
+    # 1. 데이터프레임 생성 및 그룹화 (중복 제거 및 합산)
     df = pd.DataFrame(positions) if positions else pd.DataFrame()
-    
     if not df.empty:
-        # 1. 이름과 티커를 기준으로 수량과 금액 합산 (계좌별로 분리되어 있던 항목들 통합)
         df = df.groupby(["name", "ticker"]).agg({
             "qty": "sum",
             "value_krw": "sum",
@@ -573,15 +342,15 @@ def main():
             "current": "first"
         }).reset_index()
         
-        # 2. 통합된 데이터 기반으로 수익률 재계산
         df["pnl_pct"] = (df["pnl_krw"] / df["cost_krw"]) * 100
         df["daily_pct"] = (df["daily_pnl_krw"] / (df["value_krw"] - df["daily_pnl_krw"])) * 100
-        
-        # 3. 평가금액 기준 내림차순 정렬
         df = df.sort_values("value_krw", ascending=False)
+    
+    # 2. TV(총 평가금액)를 데이터프레임 기준으로 다시 계산 (이 코드가 루프보다 앞에 있어야 합니다)
+    tv = df["value_krw"].sum() if not df.empty else 0
 
+    # 3. HTML 생성 루프
     holding_rows = ""
-    # 4. 이제 정제된 df를 사용하여 HTML 루프 생성
     for i, row in df.iterrows():
         clr = HOLD_COLORS[i % len(HOLD_COLORS)]
         w = row["value_krw"] / tv * 100 if tv > 0 else 0
@@ -600,7 +369,6 @@ def main():
             <span style="font-size:11px;font-weight:600;color:{pclr};font-family:'JetBrains Mono',monospace;min-width:56px;text-align:right">{sp}{row['pnl_pct']:.2f}%</span>
           </div>
         </div>"""
-    # ── [수정된 부분 끝] ───────────────────────────
         
         if not df_sorted_val.empty:
             for i, ((_, row), clr) in enumerate(zip(df_sorted_val.iterrows(), HOLD_COLORS)):
