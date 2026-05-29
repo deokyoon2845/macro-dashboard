@@ -83,8 +83,9 @@ def main():
     print(f"📰 뉴스 수집 — {len(items)}개 종목")
     stock_news = {}; seen_sectors = set()
     for it in items:
-        name=it.get("name",""); sector=it.get("sector","기타")
-        ticker=it.get("ticker",""); currency=it.get("currency","KRW")
+        if not isinstance(it, dict): 
+        continue # 딕셔너리가 아니면 건너뜀
+        if it.get("currency","KRW") != "KRW": continue
         if not name: continue
         if sector and sector!="기타": seen_sectors.add(sector)
         print(f"  [{name}]")
