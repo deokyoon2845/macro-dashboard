@@ -158,3 +158,23 @@ def render_sticky_nav():
             '<div style="height:1px;background:#222A3A;margin:8px 0 6px"></div>',
             unsafe_allow_html=True
         )
+
+import pandas as pd
+import os
+
+def merge_with_existing(new_df, file_path, date_col="date"):
+    """기존 파케이(parquet) 파일이 있으면 새 데이터와 병합하는 함수"""
+    if not os.path.exists(file_path):
+        return new_df
+    try:
+        old_df = pd.read_parquet(file_path)
+        combined = pd.concat([old_df, new_df]).drop_duplicates(subset=[date_col], keep="last")
+        return combined.sort_values(date_col).reset_index(drop=True)
+    except Exception:
+        return new_df
+
+def sanity_check(df):
+    """데이터프레임이 정상적으로 수집되었는지 확인하는 함수"""
+    if df is None or df.empty:
+        return False
+    return True
