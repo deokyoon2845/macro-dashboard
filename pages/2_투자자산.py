@@ -407,7 +407,7 @@ def main():
     mdf = load_parquet(MARKET_FILE)
     usdkrw = get_usdkrw(mdf)
 
-    positions_all = [compute_pos(p, prices, usdkrw) for p in portfolio]
+    positions_all = [compute_pos(p, prices, usdkrw) for p in portfolio if isinstance(p, dict)]
     positions_all = [p for p in positions_all if p]
 
     # 계좌 선택 UI
