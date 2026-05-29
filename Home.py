@@ -310,4 +310,200 @@ with bc2:
             st.warning("Streamlit Secrets에 ANTHROPIC_API_KEY를 등록하세요.")
         else:
             with st.spinner("Claude가 브리핑 생성 중…"):
-                nb
+                nb = gen_brief_realtime(api_key)
+                if nb:
+                    st.session_state[BRIEF_KEY] = nb
+                    save_brief(nb); brief = nb; st.rerun()
+
+if brief:
+    mood_style = {"positive": (B5,"rgba(56,139,253,.15)"), "neutral": (SUB,C2), "cautious": (B7,"rgba(31,111,235,.15)")}
+    mc, mbg = mood_style.get(brief.get("mood","neutral"), (SUB,C2))
+    gen_t  = safe(brief.get("generated_at",""))
+    rt_tag = f'<span style="background:rgba(56,139,253,.2);color:{B5};padding:2px 8px;border-radius:10px;font-size:9px;font-weight:600;font-family:JetBrains Mono">실시간</span>' if brief.get("realtime") else ""
+
+    st.markdown(f"""
+    <div style="background:{CARD};border:1px solid {BORD};border-left:4px solid {mc};border-radius:10px;padding:18px 22px;margin-bottom:1rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="background:{mbg};color:{mc};padding:3px 10px;border-radius:10px;font-size:9px;font-weight:700;font-family:'JetBrains Mono',monospace">{safe(brief.get("mood","")).upper()}</span>{rt_tag}
+        </div>
+        <span style="font-size:9px;color:{MUT};font-family:'JetBrains Mono',monospace">{gen_t} 생성</span>
+      </div>
+      <div style="font-size:19px;font-weight:700;color:{TXT};margin-bottom:12px;line-height:1.3">{safe(brief.get("headline",""))}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div style="background:{C2};border-radius:7px;padding:11px 14px"><div style="font-size:9px;color:{MUT};text-transform:uppercase;margin-bottom:5px">📊 시장</div><div style="font-size:12px;color:{TXT};line-height:1.6">{safe(brief.get("market",""))}</div></div>
+        <div style="background:{C2};border-radius:7px;padding:11px 14px"><div style="font-size:9px;color:{MUT};text-transform:uppercase;margin-bottom:5px">💼 보유 종목</div><div style="font-size:12px;color:{TXT};line-height:1.6">{safe(brief.get("holdings",""))}</div></div>
+        <div style="background:{C2};border-radius:7px;padding:11px 14px"><div style="font-size:9px;color:{MUT};text-transform:uppercase;margin-bottom:5px">🏭 섹터</div><div style="font-size:12px;color:{TXT};line-height:1.6">{safe(brief.get("sectors",""))}</div></div>
+        <div style="background:{C2};border-radius:7px;padding:11px 14px"><div style="font-size:9px;color:{MUT};text-transform:uppercase;margin-bottom:5px">📰 뉴스</div><div style="font-size:12px;color:{TXT};line-height:1.6">{safe(brief.get("news",""))}</div></div>
+      </div>
+      <div style="background:rgba(56,139,253,.08);border:1px solid rgba(56,139,253,.2);border-radius:7px;padding:11px 14px;font-size:12px;color:{BLUE};font-weight:600">💬 {safe(brief.get("action",""))}</div>
+    </div>""", unsafe_allow_html=True)
+else:
+    st.markdown(f'<div style="background:{CARD};border:1px solid {BORD};border-radius:10px;padding:30px;text-align:center;margin-bottom:1rem"><div style="font-size:14px;color:{SUB}">브리핑 없음 — 🔄 버튼으로 생성하거나 GitHub Actions를 실행하세요</div></div>', unsafe_allow_html=True)
+
+
+# ════════════════════════════════════════════════════════════════
+# 계좌별 평가금액 잔고 추이 차트 (최적화 교체됨)
+# ════════════════════════════════════════════════════════════════
+portfolio = load_json("portfolio.json", [])
+prices_df = load_pq("portfolio_prices.parquet")
+
+def compute_account_history(pf_list, prices, mdf):
+    """일자별로 각 계좌의 총 평가금액을 계산하는 함수"""
+    if prices.empty or not pf_list or not isinstance(pf_list, list): 
+        return pd.DataFrame()
+        
+    all_dates = sorted(prices["date"].dropna().unique())
+    fx_df = pd.DataFrame()
+    if not mdf.empty and "indicator" in mdf.columns:
+        fx_df = mdf[mdf["indicator"]=="USDKRW"][["date","value"]].rename(columns={"value":"fx"}).sort_values("date")
+        
+    rows = []
+    for d in all_dates:
+        row = {"date": d}
+        total_val = 0
+        
+        fx_now = 1380.0
+        if not fx_df.empty:
+            fs = fx_df[fx_df["date"]<=d]
+            if not fs.empty: fx_now = float(fs.iloc[-1]["fx"])
+            
+        acct_vals = {}
+        for it in pf_list:
+            if not isinstance(it, dict): continue
+            acct = it.get("account", "일반")
+            ticker = it.get("ticker")
+            if not ticker: continue
+            
+            lots = [l for l in it.get("lots", []) if isinstance(l, dict) and pd.Timestamp(l.get("date")) <= d]
+            qty = sum(l.get("qty", 0) for l in lots)
+            if qty <= 0: continue
+            
+            ps = prices[(prices["ticker"]==ticker) & (prices["date"]<=d)].sort_values("date")
+            if ps.empty: continue
+            
+            fxv = fx_now if it.get("currency", "KRW") == "USD" else 1
+            val = qty * float(ps.iloc[-1]["close"]) * fxv
+            
+            acct_vals[acct] = acct_vals.get(acct, 0) + val
+            total_val += val
+            
+        if total_val > 0:
+            row.update(acct_vals)
+            row["Total"] = total_val
+            rows.append(row)
+            
+    return pd.DataFrame(rows)
+
+st.markdown(f'<div style="font-size:16px;font-weight:700;color:{TXT};margin-bottom:.6rem">📈 계좌별 잔고 추이</div>', unsafe_allow_html=True)
+
+if portfolio and not prices_df.empty:
+    hist_df = compute_account_history(portfolio, prices_df, market)
+    
+    if not hist_df.empty:
+        fig_bal = go.Figure()
+        
+        # 'date'와 'Total'을 제외한 실제 계좌 이름 추출
+        accounts = [c for c in hist_df.columns if c not in ["date", "Total"]]
+        
+        for acct in accounts:
+            clr = ACCT_COLORS.get(acct, B5)
+            fig_bal.add_trace(go.Scatter(
+                x=hist_df["date"], 
+                y=hist_df[acct]/1e6, # 단위를 백만원으로 표시
+                name=ACCT_LABELS.get(acct, acct),
+                mode="lines", 
+                stackgroup="one", # 누적 영역 차트 설정
+                line=dict(width=1.5, color=clr),
+                hovertemplate=f"<b>{ACCT_LABELS.get(acct, acct)}</b> %{{y:,.1f}}백만<extra></extra>"
+            ))
+            
+        fig_bal.update_layout(
+            paper_bgcolor=CARD, plot_bgcolor=CARD, height=320,
+            margin=dict(l=10, r=10, t=10, b=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.0, x=0, font=dict(size=10, color=SUB), bgcolor="rgba(0,0,0,0)"),
+            hovermode="x unified",
+            hoverlabel=dict(bgcolor=C2, bordercolor=BORD, font=dict(family="JetBrains Mono", size=10, color=TXT)),
+            xaxis=dict(showgrid=False, zeroline=False, tickfont=dict(size=9, color=MUT)),
+            yaxis=dict(showgrid=True, gridcolor=G, zeroline=False, tickfont=dict(size=9, color=MUT), ticksuffix="M", side="right")
+        )
+        st.plotly_chart(fig_bal, use_container_width=True, config={"displayModeBar": False})
+        
+        # 마지막 업데이트 기준 텍스트
+        st.markdown(f"""
+        <div style="background:{C2};border:1px solid {BORD};border-radius:8px;padding:5px 14px;
+          font-size:9px;color:{MUT};font-family:'JetBrains Mono',monospace;margin-top:-10px;margin-bottom:10px">
+          데이터 최종 갱신 · {now.strftime("%Y-%m-%d %H:%M")} KST
+        </div>""", unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div style="background:{C2};height:150px;display:flex;align-items:center;justify-content:center;font-size:12px;color:{MUT};border-radius:10px;">수집된 가격 히스토리 데이터가 없습니다. (GitHub Actions 확인)</div>', unsafe_allow_html=True)
+else:
+    st.markdown(f'<div style="background:{C2};height:150px;display:flex;align-items:center;justify-content:center;font-size:12px;color:{MUT};border-radius:10px;">등록된 보유 종목이 없거나 가격 데이터가 수집되지 않았습니다.</div>', unsafe_allow_html=True)
+
+
+# ════════════════════════════════════════════════════════════════
+# 주간 리포트
+# ════════════════════════════════════════════════════════════════
+weekly = load_json("weekly_report.json", None)
+if weekly and isinstance(weekly, dict) and weekly.get("headline"):
+    grade = weekly.get("grade","B")
+    gc = {"S":UP,"A":B5,"B":BLUE,"C":SUB,"D":DN}.get(grade, SUB)
+    st.markdown(f"""
+    <div style="height:.6rem"></div>
+    <details style="background:{CARD};border:1px solid {BORD};border-radius:10px;padding:14px 18px;cursor:pointer">
+      <summary style="font-size:13px;font-weight:700;color:{TXT};list-style:none;display:flex;align-items:center;gap:8px">
+        📊 주간 리포트
+        <span style="background:rgba(56,139,253,.15);color:{gc};padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700">{safe(grade)}</span>
+        <span style="font-size:12px;color:{TXT};font-weight:600">{safe(weekly.get("headline",""))}</span>
+        <span style="font-size:9px;color:{MUT};margin-left:auto;font-family:'JetBrains Mono',monospace">{safe(weekly.get("week_range",""))} · {safe(weekly.get("generated_at",""))} 생성</span>
+      </summary>
+      <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:{C2};border-radius:7px;padding:10px 13px"><div style="font-size:9px;color:{MUT};margin-bottom:4px">성과</div><div style="font-size:11px;color:{TXT};line-height:1.6">{safe(weekly.get("performance",""))}</div></div>
+        <div style="background:{C2};border-radius:7px;padding:10px 13px"><div style="font-size:9px;color:{MUT};margin-bottom:4px">시장 환경</div><div style="font-size:11px;color:{TXT};line-height:1.6">{safe(weekly.get("market_context",""))}</div></div>
+        <div style="background:{C2};border-radius:7px;padding:10px 13px"><div style="font-size:9px;color:{MUT};margin-bottom:4px">교훈</div><div style="font-size:11px;color:{TXT};line-height:1.6">{safe(weekly.get("lessons",""))}</div></div>
+        <div style="background:{C2};border-radius:7px;padding:10px 13px"><div style="font-size:9px;color:{MUT};margin-bottom:4px">다음 주 주목</div><div style="font-size:11px;color:{TXT};line-height:1.6">{safe(weekly.get("next_week",""))}</div></div>
+      </div>
+    </details>""", unsafe_allow_html=True)
+
+# ════════════════════════════════════════════════════════════════
+# 다가오는 일정 (events.json) — 미니 위젯
+# ════════════════════════════════════════════════════════════════
+_events_raw = load_json("events.json", {})
+_events = _events_raw.get("events", []) if isinstance(_events_raw, dict) else []
+_EV_STYLE = {"fomc": (UP, "🏛"), "cpi": (GOLD, "📊"), "bok": (B5, "🇰🇷"), "earnings": (PUR_DK, "💵"), "custom": (SUB, "📌")}
+_today = now.date()
+_upcoming = []
+for _e in _events:
+    try: _d = datetime.strptime(_e["date"], "%Y-%m-%d").date()
+    except Exception: continue
+    if _d >= _today: _upcoming.append((_d, _e))
+_upcoming.sort(key=lambda x: x[0])
+_upcoming = _upcoming[:4]
+
+if _upcoming:
+    st.markdown(f'<div style="font-size:16px;font-weight:700;color:{TXT};margin:1.6rem 0 .6rem">⏰ 다가오는 일정</div>', unsafe_allow_html=True)
+    _ev_cols = st.columns(len(_upcoming))
+    for _col, (_d, _e) in zip(_ev_cols, _upcoming):
+        _clr, _icon = _EV_STYLE.get(_e.get("type", "custom"), _EV_STYLE["custom"])
+        _dday = (_d - _today).days
+        _dlabel = "D-DAY" if _dday == 0 else f"D-{_dday}"
+        with _col:
+            st.markdown(f"""
+            <div style="background:{CARD};border:1px solid {BORD};border-left:3px solid {_clr};border-radius:9px;padding:12px 14px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <span style="font-size:16px">{_icon}</span>
+                <span style="background:{_clr}22;color:{_clr};padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace">{_dlabel}</span>
+              </div>
+              <div style="font-size:12px;font-weight:700;color:{TXT};margin-bottom:3px">{safe(_e.get("title",""))}</div>
+              <div style="font-size:9px;color:{MUT};font-family:'JetBrains Mono',monospace">{_d.strftime("%Y-%m-%d")} · {safe(_e.get("time",""))}</div>
+            </div>""", unsafe_allow_html=True)
+
+# ════════════════════════════════════════════════════════════════
+# 푸터
+# ════════════════════════════════════════════════════════════════
+st.markdown(f"""
+<div style="margin-top:2rem;padding:10px 16px;background:{C2};border:1px solid {BORD};border-radius:8px;font-size:10px;color:{MUT};font-family:'JetBrains Mono',monospace;display:flex;justify-content:space-between;align-items:center">
+  <span>📅 매일 KST 07:00 · FRED · yfinance · CNN F&amp;G · ECOS · 네이버 · DART</span>
+  <span>{now.strftime("%Y-%m-%d %H:%M")} KST</span>
+</div>
+""", unsafe_allow_html=True)
