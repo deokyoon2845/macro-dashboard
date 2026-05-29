@@ -171,12 +171,12 @@
   },
   {
     "id": "c0e1f2a3",
-    "name": "삼성전자SK하이닉스채권혼합50",
+    "name": "RISE 삼성전자SK하이닉스채권혼합50",
     "ticker": "0162Z0.KS",
     "sector": "기타",
     "market": "KOSPI",
     "currency": "KRW",
-    "account": "일반",
+    "account": "DC",
     "lots": [
       {
         "date": "2026-05-29",
