@@ -559,10 +559,30 @@ def main():
 
     render_ticker_bar(positions)
 
-    df = pd.DataFrame(positions) if positions else pd.DataFrame()
-    if df.empty:
-        st.markdown(f'<div style="background:{CARD};border:1px solid {BORD};border-radius:12px;padding:60px;text-align:center;margin-top:20px"><div style="font-size:40px;margin-bottom:16px">📊</div><div style="font-size:18px;font-weight:600;color:{TXT};margin-bottom:8px">{"이 계좌에 보유 종목 없음" if sel_account else "보유 종목 없음"}</div><div style="font-size:13px;color:{SUB}">우측 상단 ⚙️ 종목 관리에서 종목을 추가해주세요</div></div>', unsafe_allow_html=True)
-        st.stop()
+# ── 기존 코드(데이터프레임 생성 부분)를 아래처럼 수정 ───────────────────
+    
+    # 1. 포트폴리오를 계좌 + 종목명으로 그룹화하여 합산
+    df = pd.DataFrame(positions)
+    if not df.empty:
+        # 같은 계좌의 같은 종목이 여러 번 들어있을 경우 수량과 평가금액 합산
+        df = df.groupby(["account", "name", "ticker"]).agg({
+            "qty": "sum",
+            "value_krw": "sum",
+            "cost_krw": "sum",
+            "daily_pnl_krw": "sum",
+            "pnl_krw": "sum",
+            "current": "first"
+        }).reset_index()
+        
+        # 수익률 및 비중 재계산
+        df["pnl_pct"] = (df["pnl_krw"] / df["cost_krw"]) * 100
+        df["daily_pct"] = (df["daily_pnl_krw"] / (df["value_krw"] - df["daily_pnl_krw"])) * 100
+        
+        # 2. 정렬: 평가금액 순으로 정렬
+        df = df.sort_values("value_krw", ascending=False)
+
+    # 이제 이 df를 사용하여 아래의 rows_html 루프를 돌리면 
+    # 종목이 중복되지 않고 깔끔하게 합쳐져서 나타납니다.
 
     # KPI 지표 정밀 계산
     df_p = df[df["current"].notna()] if "current" in df.columns else pd.DataFrame()
