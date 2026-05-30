@@ -51,11 +51,12 @@ var MAP = {
   '모니터링': ['📊','모니터링'],
   '투자자산': ['📈','투자자산'],
   '트렌딩':   ['🔥','트렌딩'],
+  '리포트':   ['📑','리포트'],
   '일정':     ['📅','일정'],
   '스터디':   ['📚','스터디'],
   '이슈':     ['📰','이슈'],
 };
-var ORDER = ['홈','모니터링','투자자산','트렌딩','일정','스터디','이슈'];
+var ORDER = ['홈','모니터링','투자자산','트렌딩','리포트','일정','스터디','이슈'];
 
 function getLabel(href){
   try{
@@ -147,6 +148,7 @@ def render_sticky_nav():
             ("pages/1_모니터링.py", "📊  모니터링"),
             ("pages/3_투자자산.py", "📈  투자자산"),
             ("pages/7_트렌딩.py",   "🔥  트렌딩"),
+            ("pages/8_리포트.py",   "📑  리포트"),
             ("pages/6_일정.py",     "📅  일정"),
             ("pages/4_스터디.py",   "📚  스터디"),
             ("pages/5_이슈.py",     "📰  이슈"),
@@ -160,3 +162,53 @@ def render_sticky_nav():
             '<div style="height:1px;background:#222A3A;margin:8px 0 6px"></div>',
             unsafe_allow_html=True
         )
+
+    # 3. 사이드바 펼치기 플로팅 버튼 (접혔을 때만 표시, 항상 작동)
+    #    CSS의 collapsedControl에 의존하지 않고 JS로 직접 사이드바 제어
+    _sb_btn_style = (
+        "position:fixed;top:12px;left:10px;z-index:999999;"
+        "background:#0D1117;border:2px solid #388BFD;border-radius:10px;"
+        "padding:9px 14px;cursor:pointer;font-size:15px;font-weight:700;"
+        "color:#388BFD;box-shadow:0 2px 14px rgba(56,139,253,.45);"
+        "display:none;align-items:center;gap:6px;font-family:sans-serif;"
+        "transition:all .15s"
+    )
+    _sb_js = (
+        "(function(){"
+        "function findSidebar(){return document.querySelector('section[data-testid=\"stSidebar\"]');}"
+        "function isCollapsed(sb){"
+        "if(!sb)return true;"
+        "var w=sb.getBoundingClientRect().width;"
+        "var av=sb.getAttribute('aria-expanded');"
+        "return (w<50)||(av==='false');"
+        "}"
+        "function expandSidebar(){"
+        "var sb=findSidebar();"
+        "var ctrl=document.querySelector('[data-testid=\"collapsedControl\"]');"
+        "if(ctrl){var b=ctrl.querySelector('button')||ctrl;b.click();return;}"
+        "var arrow=document.querySelector('[data-testid=\"stSidebarCollapsedControl\"] button');"
+        "if(arrow){arrow.click();return;}"
+        "if(sb){sb.setAttribute('aria-expanded','true');"
+        "sb.style.transform='none';sb.style.width='';}"
+        "var allbtns=document.querySelectorAll('button[kind=\"header\"],button[kind=\"headerNoPadding\"]');"
+        "for(var i=0;i<allbtns.length;i++){allbtns[i].click();}"
+        "}"
+        "function sync(){"
+        "var btn=document.getElementById('dy-sb-open');"
+        "if(!btn)return;"
+        "var sb=findSidebar();"
+        "btn.style.display=isCollapsed(sb)?'flex':'none';"
+        "}"
+        "window.__dyExpandSidebar=expandSidebar;"
+        "var obs=new MutationObserver(sync);"
+        "obs.observe(document.body,{childList:true,subtree:true,attributes:true});"
+        "setInterval(sync,500);"
+        "setTimeout(sync,300);"
+        "})();"
+    )
+    st.markdown(
+        f'<div id="dy-sb-open" style="{_sb_btn_style}" '
+        f'onclick="window.__dyExpandSidebar && window.__dyExpandSidebar()">☰ 메뉴</div>'
+        f'<script>{_sb_js}</script>',
+        unsafe_allow_html=True
+    )
