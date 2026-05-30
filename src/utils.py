@@ -50,11 +50,12 @@ var MAP = {
   '/':        ['🏠','홈'],
   '모니터링': ['📊','모니터링'],
   '투자자산': ['📈','투자자산'],
+  '트렌딩':   ['🔥','트렌딩'],
   '일정':     ['📅','일정'],
   '스터디':   ['📚','스터디'],
-  '이슈':     ['🔥','이슈'],
+  '이슈':     ['📰','이슈'],
 };
-var ORDER = ['홈','모니터링','투자자산','일정','스터디','이슈'];
+var ORDER = ['홈','모니터링','투자자산','트렌딩','일정','스터디','이슈'];
 
 function getLabel(href){
   try{
@@ -145,9 +146,10 @@ def render_sticky_nav():
             ("Home.py",            "🏠  홈"),
             ("pages/1_모니터링.py", "📊  모니터링"),
             ("pages/3_투자자산.py", "📈  투자자산"),
+            ("pages/7_트렌딩.py",   "🔥  트렌딩"),
             ("pages/6_일정.py",     "📅  일정"),
             ("pages/4_스터디.py",   "📚  스터디"),
-            ("pages/5_이슈.py",     "🔥  이슈"),
+            ("pages/5_이슈.py",     "📰  이슈"),
         ]
         for _file, _label in _pages:
             try:
@@ -158,23 +160,3 @@ def render_sticky_nav():
             '<div style="height:1px;background:#222A3A;margin:8px 0 6px"></div>',
             unsafe_allow_html=True
         )
-
-import pandas as pd
-import os
-
-def merge_with_existing(new_df, file_path, date_col="date"):
-    """기존 파케이(parquet) 파일이 있으면 새 데이터와 병합하는 함수"""
-    if not os.path.exists(file_path):
-        return new_df
-    try:
-        old_df = pd.read_parquet(file_path)
-        combined = pd.concat([old_df, new_df]).drop_duplicates(subset=[date_col], keep="last")
-        return combined.sort_values(date_col).reset_index(drop=True)
-    except Exception:
-        return new_df
-
-def sanity_check(df):
-    """데이터프레임이 정상적으로 수집되었는지 확인하는 함수"""
-    if df is None or df.empty:
-        return False
-    return True
