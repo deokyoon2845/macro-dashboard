@@ -133,15 +133,11 @@ def render_sticky_nav():
     """
     스티키 상단 네비게이션 바 렌더링.
     각 페이지의 st.set_page_config() 바로 다음 줄에 호출.
-
-    사용법:
-        from utils import render_sticky_nav
-        render_sticky_nav()
     """
     # 1. JS 주입 (nav 빌더)
     st.markdown(_NAV_JS, unsafe_allow_html=True)
 
-    # 2. 사이드바에 모든 페이지 링크 렌더링 (JS가 href를 읽어 nav 구성)
+    # 2. 사이드바에 모든 페이지 링크 렌더링
     with st.sidebar:
         _pages = [
             ("Home.py",            "🏠  홈"),
@@ -163,52 +159,59 @@ def render_sticky_nav():
             unsafe_allow_html=True
         )
 
-    # 3. 사이드바 펼치기 플로팅 버튼 (접혔을 때만 표시, 항상 작동)
-    #    CSS의 collapsedControl에 의존하지 않고 JS로 직접 사이드바 제어
-    _sb_btn_style = (
-        "position:fixed;top:12px;left:10px;z-index:999999;"
+    # 3. 사이드바 펼치기 플로팅 버튼 (Streamlit 1.58 대응)
+    # collapsedControl은 1.58에 존재하지 않음 → localStorage + DOM 방식
+    _btn_css = (
+        "position:fixed;top:14px;left:10px;z-index:999999;"
         "background:#0D1117;border:2px solid #388BFD;border-radius:10px;"
-        "padding:9px 14px;cursor:pointer;font-size:15px;font-weight:700;"
-        "color:#388BFD;box-shadow:0 2px 14px rgba(56,139,253,.45);"
-        "display:none;align-items:center;gap:6px;font-family:sans-serif;"
-        "transition:all .15s"
+        "padding:9px 15px;cursor:pointer;font-size:14px;font-weight:700;"
+        "color:#388BFD;box-shadow:0 2px 16px rgba(56,139,253,.5);"
+        "display:none;align-items:center;gap:6px;font-family:sans-serif;user-select:none"
     )
-    _sb_js = (
+    # JS: isCollapsed 판단 → localStorage false 설정 → 버튼 클릭 → transform 강제
+    _btn_js = (
         "(function(){"
-        "function findSidebar(){return document.querySelector('section[data-testid=\"stSidebar\"]');}"
-        "function isCollapsed(sb){"
-        "if(!sb)return true;"
-        "var w=sb.getBoundingClientRect().width;"
-        "var av=sb.getAttribute('aria-expanded');"
-        "return (w<50)||(av==='false');"
-        "}"
-        "function expandSidebar(){"
-        "var sb=findSidebar();"
-        "var ctrl=document.querySelector('[data-testid=\"collapsedControl\"]');"
-        "if(ctrl){var b=ctrl.querySelector('button')||ctrl;b.click();return;}"
-        "var arrow=document.querySelector('[data-testid=\"stSidebarCollapsedControl\"] button');"
-        "if(arrow){arrow.click();return;}"
-        "if(sb){sb.setAttribute('aria-expanded','true');"
-        "sb.style.transform='none';sb.style.width='';}"
-        "var allbtns=document.querySelectorAll('button[kind=\"header\"],button[kind=\"headerNoPadding\"]');"
-        "for(var i=0;i<allbtns.length;i++){allbtns[i].click();}"
-        "}"
-        "function sync(){"
-        "var btn=document.getElementById('dy-sb-open');"
-        "if(!btn)return;"
-        "var sb=findSidebar();"
-        "btn.style.display=isCollapsed(sb)?'flex':'none';"
-        "}"
-        "window.__dyExpandSidebar=expandSidebar;"
-        "var obs=new MutationObserver(sync);"
-        "obs.observe(document.body,{childList:true,subtree:true,attributes:true});"
-        "setInterval(sync,500);"
-        "setTimeout(sync,300);"
-        "})();"
+        + "function isCol(){"
+        +   "var s=document.querySelector('section[data-testid=\"stSidebar\"]');"
+        +   "return s?s.getBoundingClientRect().width<60:false;"
+        + "}"
+        + "function sync(){"
+        +   "var b=document.getElementById('dymenu');"
+        +   "if(b)b.style.display=isCol()?'flex':'none';"
+        + "}"
+        + "function expand(){"
+        # 방법 1: localStorage stSidebarCollapsed-* = false
+        +   "try{"
+        +     "var ks=Object.keys(localStorage);"
+        +     "for(var i=0;i<ks.length;i++){"
+        +       "if(ks[i].indexOf('stSidebarCollapsed')===0){"
+        +         "localStorage.setItem(ks[i],'false');"
+        +         "window.dispatchEvent(new StorageEvent('storage',{key:ks[i],newValue:'false',storageArea:localStorage}));"
+        +       "}"
+        +     "}"
+        +   "}catch(e){}"
+        # 방법 2: stSidebarCollapseButton 버튼 클릭
+        +   "try{"
+        +     "var cb=document.querySelector('[data-testid=\"stSidebarCollapseButton\"] button');"
+        +     "if(cb&&isCol())cb.click();"
+        +   "}catch(e){}"
+        # 방법 3: 직접 transform/margin 제거
+        +   "setTimeout(function(){"
+        +     "if(isCol()){"
+        +       "var sb=document.querySelector('section[data-testid=\"stSidebar\"]');"
+        +       "if(sb){sb.style.cssText+=';transform:none!important;margin-left:0!important;left:0!important;';}"
+        +     "}"
+        +   "},200);"
+        + "}"
+        + "window._dyExp=expand;"
+        + "new MutationObserver(sync).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class']});"
+        + "setInterval(sync,500);"
+        + "setTimeout(sync,800);setTimeout(sync,2000);"
+        + "})()"
     )
     st.markdown(
-        f'<div id="dy-sb-open" style="{_sb_btn_style}" '
-        f'onclick="window.__dyExpandSidebar && window.__dyExpandSidebar()">☰ 메뉴</div>'
-        f'<script>{_sb_js}</script>',
+        '<div id="dymenu" style="' + _btn_css + '" ' +
+        'onclick="window._dyExp&&window._dyExp()">☰ 메뉴</div>' +
+        '<script>' + _btn_js + '</script>',
         unsafe_allow_html=True
     )
