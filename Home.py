@@ -6,7 +6,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import json, os, re, base64, html as html_lib
+import json, os, re, base64, html as html_lib, requests
 from pathlib import Path
 from datetime import datetime
 import sys
@@ -127,6 +127,54 @@ def get_secret(k, default=""):
 
 def safe(v): return html_lib.escape(str(v)) if v else ""
 
+
+# ── 실시간 가격 조회 (개선 1) ─────────────────────────────────
+@st.cache_data(ttl=180)  # 3분 캐시
+def fetch_live_prices(tickers_tuple):
+    """yfinance fast_info로 현재가 + 전일종가 일괄 수집"""
+    import yfinance as yf
+    out = {}
+    for tk in tickers_tuple:
+        try:
+            fi = yf.Ticker(tk).fast_info
+            cur  = fi.get("lastPrice") or fi.get("last_price")
+            prev = fi.get("previousClose") or fi.get("previous_close")
+            if cur:
+                out[tk] = {"cur": float(cur),
+                           "prev": float(prev) if prev else float(cur)}
+        except Exception:
+            continue
+    return out
+
+# ── 데이터 신선도 배너 (개선 3) ────────────────────────────────
+def render_freshness_banner(prices_df_):
+    if prices_df_.empty or "date" not in prices_df_.columns:
+        st.markdown(
+            '<div style="background:#3D1418;border:1px solid #F85149;border-radius:8px;'
+            'padding:10px 16px;margin-bottom:.8rem;font-size:12px;color:#F85149;font-weight:600">'
+            '⚠ 가격 데이터가 없습니다 — GitHub Actions 실행 여부를 확인하세요'
+            '</div>', unsafe_allow_html=True)
+        return
+    last = prices_df_["date"].max()
+    try:
+        biz_days = max(0, len(pd.bdate_range(
+            last.normalize(), pd.Timestamp.now().normalize())) - 1)
+    except Exception:
+        biz_days = 0
+    if biz_days >= 2:
+        st.markdown(
+            '<div style="background:#3A2E10;border:1px solid #D4A017;border-radius:8px;'
+            'padding:10px 16px;margin-bottom:.8rem;font-size:12px;color:#D4A017;font-weight:600">'
+            f'⚠ 데이터가 <b>{biz_days}영업일</b> 지났습니다 (최종: {last:%Y-%m-%d}) '
+            '— 수집이 멈췄을 수 있습니다. GitHub Actions를 확인하세요'
+            '</div>', unsafe_allow_html=True)
+    elif biz_days == 1:
+        st.markdown(
+            '<div style="background:#131924;border:1px solid #388BFD44;border-radius:8px;'
+            'padding:8px 16px;margin-bottom:.8rem;font-size:11px;color:#8B949E">'
+            f'ℹ 가격 기준: {last:%Y-%m-%d} (전 거래일 종가)</div>',
+            unsafe_allow_html=True)
+
 market    = load_pq("market_prices.parquet")
 fred      = load_pq("fred_indicators.parquet")
 portfolio = load_json("portfolio.json", [])
@@ -177,22 +225,35 @@ fx = float(fx_row["value"]) if fx_row is not None else 1380.0
 
 @st.cache_data(ttl=300)
 def get_positions():
-    if not portfolio or prices_df.empty: return []
+    if not portfolio: return []
+    # 실시간 가격 수집 (개선 1: parquet 없어도 동작, 있으면 폴백)
+    all_tickers = tuple(sorted({
+        it.get("ticker","") for it in portfolio
+        if isinstance(it,dict) and it.get("ticker")
+    }))
+    live = fetch_live_prices(all_tickers) if all_tickers else {}
     out = []
     for it in portfolio:
         if not isinstance(it, dict): continue
         lots = [l for l in it.get("lots",[]) if isinstance(l,dict)]
         ticker = it.get("ticker","")
         if not lots or not ticker: continue
-        qty = sum(l.get("qty",0) for l in lots)
-        cost= sum(l.get("qty",0)*l.get("price",0) for l in lots)
+        qty  = sum(l.get("qty",0) for l in lots)
+        cost = sum(l.get("qty",0)*l.get("price",0) for l in lots)
         if qty<=0: continue
         avg = cost/qty
-        sub = prices_df[prices_df["ticker"]==ticker].sort_values("date")
-        if sub.empty: continue
-        cur  = float(sub.iloc[-1]["close"])
-        prev = float(sub.iloc[-2]["close"]) if len(sub)>=2 else cur
-        fxv  = fx if it.get("currency")=="USD" else 1
+        # 우선순위: 실시간 > parquet > skip
+        if ticker in live:
+            cur  = live[ticker]["cur"]
+            prev = live[ticker]["prev"]
+        elif not prices_df.empty:
+            sub = prices_df[prices_df["ticker"]==ticker].sort_values("date")
+            if sub.empty: continue
+            cur  = float(sub.iloc[-1]["close"])
+            prev = float(sub.iloc[-2]["close"]) if len(sub)>=2 else cur
+        else:
+            continue
+        fxv = fx if it.get("currency")=="USD" else 1
         out.append({
             "name":      it.get("name",""),
             "ticker":    ticker,
@@ -204,6 +265,7 @@ def get_positions():
             "pnl_krw":   (cur-avg)*qty*fxv,
             "pnl_pct":   (cur/avg-1)*100 if avg>0 else 0,
             "daily_pct": (cur/prev-1)*100 if prev>0 else 0,
+            "live":      ticker in live,  # 실시간 여부 표시
         })
     return sorted(out, key=lambda x: -x["value_krw"])
 
@@ -233,6 +295,11 @@ if positions:
         '<div class="ticker-wrap"><div class="ticker-track">' + items_html*2 + '</div></div>',
         unsafe_allow_html=True
     )
+
+# ════════════════════════════════════════════════════════════════
+# 2-pre. 데이터 신선도 배너 (개선 3)
+# ════════════════════════════════════════════════════════════════
+render_freshness_banner(prices_df)
 
 # ════════════════════════════════════════════════════════════════
 # 2. DY Monitoring 타이틀 + KPI 미니차트 (동일 행)
