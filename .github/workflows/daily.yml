@@ -121,3 +121,10 @@ jobs:
           git add data/
           git diff --staged --quiet || git commit -m "data: $(date -u +%Y-%m-%d)"
           git push
+
+     - name: Fetch Trending
+        continue-on-error: true
+        env:
+          NAVER_CLIENT_ID:     ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+        run: pip install beautifulsoup4 && python src/fetch_trending.py     
