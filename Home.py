@@ -636,7 +636,7 @@ with right:
 
     _, rng_col = st.columns([1,9])
     with rng_col:
-        rng = st.radio("기간", ["1W","1M","3M","6M","1Y","ALL"],
+        rng = st.radio("기간", ["1W","1M","3M","6M","1Y","ALL"], index=4,
                        horizontal=True, label_visibility="collapsed", key="hero_rng")
 
     rng_cutoffs = {"1W":7,"1M":30,"3M":90,"6M":180,"1Y":365}
