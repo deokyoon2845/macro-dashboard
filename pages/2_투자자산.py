@@ -398,7 +398,7 @@ def render_freshness_banner(prices_df_, live_count=0):
 
 def main():
     if "chart_range" not in st.session_state:
-        st.session_state.chart_range = "3M"
+        st.session_state.chart_range = "1Y"
 
     portfolio = load_portfolio()
     if not isinstance(portfolio, list): portfolio = []
@@ -645,7 +645,7 @@ def main():
     with right:
         _, rng_col = st.columns([1,9])
         with rng_col:
-            rng = st.radio("기간",["1W","1M","3M","6M","1Y","ALL"],
+            rng = st.radio("기간",["1W","1M","3M","6M","1Y","ALL"], index=4,
                            horizontal=True, label_visibility="collapsed", key="rng")
 
         # 계좌별 히스토리 계산
